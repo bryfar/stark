@@ -5,9 +5,9 @@ As a developer, I want to switch between Plan Mode (read-only analysis) and Buil
 
 **Blocked by:** 01 — MVP Multi-Provider LLM Chat & UI Base
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] HeaderBar Plan Mode vs Build Mode toggle with reactive agent mode state.
-- [ ] Gitignore-aware repository tree indexer (`repo::indexer`) cached locally in Rust backend.
-- [ ] Visual P2 Diff Modal in frontend displaying additions and deletions per file before approval.
-- [ ] Tauri IPC command `edit:apply` for applying approved diffs and recording changes in an auditable log.
+- [x] HeaderBar Plan Mode vs Build Mode toggle with reactive agent mode state.
+- [x] Gitignore-aware repository tree indexer (`repo::indexer`) cached locally in Rust backend.
+- [x] Visual P2 Diff Modal in frontend displaying additions and deletions per file before approval.
+- [x] Tauri IPC command `edit_apply` for applying approved diffs and recording changes in an auditable log.

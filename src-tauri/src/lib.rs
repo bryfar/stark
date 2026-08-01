@@ -1,14 +1,32 @@
 pub mod providers;
+pub mod repo;
 
 use providers::{
     types::SendChatPayload, AnthropicProvider, GeminiProvider, OllamaProvider, OpenAIProvider,
     Provider,
 };
+use repo::{
+    apply_edit,
+    indexer::{index_directory, FileNode},
+    ApplyEditPayload, EditResult,
+};
+use std::path::Path;
 use tauri::AppHandle;
 
 #[tauri::command]
 fn greet(name: &str) -> String {
     format!("¡Hola, {}! Bienvenido a Crafter Linux Agent.", name)
+}
+
+#[tauri::command]
+fn repo_index(workspace_path: String) -> Result<Vec<FileNode>, String> {
+    let path = Path::new(&workspace_path);
+    index_directory(path)
+}
+
+#[tauri::command]
+fn edit_apply(payload: ApplyEditPayload) -> Result<EditResult, String> {
+    apply_edit(payload)
 }
 
 #[tauri::command]
@@ -38,7 +56,12 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_fs::init())
-        .invoke_handler(tauri::generate_handler![greet, send_chat_message])
+        .invoke_handler(tauri::generate_handler![
+            greet,
+            send_chat_message,
+            repo_index,
+            edit_apply
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
