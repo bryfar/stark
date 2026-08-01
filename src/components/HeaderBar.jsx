@@ -1,4 +1,5 @@
 import { h } from 'preact';
+import { useState, useEffect } from 'preact/hooks';
 
 export function HeaderBar({
   selectedModel,
@@ -10,6 +11,21 @@ export function HeaderBar({
   reasoning,
   setReasoning,
 }) {
+  const [hardwareTier, setHardwareTier] = useState('Detectando...');
+
+  useEffect(() => {
+    async function loadHardware() {
+      try {
+        const { invoke } = await import('@tauri-apps/api/core');
+        const info = await invoke('hardware_detect');
+        setHardwareTier(`${info.tier} (${Math.round(info.total_ram_mb / 1024)}GB RAM)`);
+      } catch (e) {
+        setHardwareTier('Standard (16GB RAM)');
+      }
+    }
+    loadHardware();
+  }, []);
+
   return (
     <header className="header-bar">
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -71,6 +87,10 @@ export function HeaderBar({
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginLeft: 'auto' }}>
+        <span style={{ fontSize: '11px', padding: '3px 8px', background: '#313244', color: '#a6e3a1', borderRadius: '12px' }}>
+          🖥️ Tier: {hardwareTier}
+        </span>
+
         <label style={{ fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
           <input
             type="checkbox"

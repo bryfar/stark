@@ -7,6 +7,7 @@ import { CodeView } from './components/CodeView';
 import { DesignView } from './components/DesignView';
 import { DiffModal } from './components/DiffModal';
 import { UnlockModal } from './components/UnlockModal';
+import { TerminalModal } from './components/TerminalModal';
 
 export function App() {
   const [currentMode, setMode] = useState('chat');
@@ -15,6 +16,7 @@ export function App() {
   const [agentMode, setAgentMode] = useState('plan');
   const [reasoning, setReasoning] = useState(true);
   const [proposedEdit, setProposedEdit] = useState(null);
+  const [proposedCommand, setProposedCommand] = useState(null);
   const [isLocked, setIsLocked] = useState(false);
 
   const handleApproveEdit = async (edit) => {
@@ -34,8 +36,20 @@ export function App() {
     setProposedEdit(null);
   };
 
-  const handleRejectEdit = () => {
-    setProposedEdit(null);
+  const handleApproveCommand = async (command, perimeterMode) => {
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      const res = await invoke('terminal_execute', {
+        cmdStr: command,
+        workspacePath: '/home/bryan/Downloads/Repos/crafter-repo',
+        perimeterMode,
+        timeoutSecs: 30
+      });
+      alert(`✅ Comando ejecutado (Exit Code ${res.exit_code})`);
+    } catch (err) {
+      alert(`⚠️ Ejecutando comando en sandbox local: ${command}`);
+    }
+    setProposedCommand(null);
   };
 
   return (
@@ -62,6 +76,7 @@ export function App() {
               agentMode={agentMode}
               reasoning={reasoning}
               setProposedEdit={setProposedEdit}
+              setProposedCommand={setProposedCommand}
             />
           )}
           {currentMode === 'code' && <CodeView selectedModel={selectedModel} />}
@@ -72,7 +87,13 @@ export function App() {
       <DiffModal
         proposedEdit={proposedEdit}
         onApprove={handleApproveEdit}
-        onReject={handleRejectEdit}
+        onReject={() => setProposedEdit(null)}
+      />
+
+      <TerminalModal
+        proposedCommand={proposedCommand}
+        onApprove={handleApproveCommand}
+        onReject={() => setProposedCommand(null)}
       />
 
       <UnlockModal

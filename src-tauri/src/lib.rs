@@ -1,7 +1,10 @@
+pub mod hardware;
 pub mod providers;
 pub mod repo;
+pub mod sandbox;
 pub mod storage;
 
+use hardware::{detect_hardware_tier, HardwareInfo};
 use providers::{
     types::SendChatPayload, AnthropicProvider, GeminiProvider, OllamaProvider, OpenAIProvider,
     Provider,
@@ -11,6 +14,7 @@ use repo::{
     indexer::{index_directory, FileNode},
     ApplyEditPayload, EditResult,
 };
+use sandbox::{execute_sandboxed_command, ExecutionResult, SandboxMode};
 use std::path::Path;
 use storage::{load_encrypted_value, save_encrypted_value, unlock_storage};
 use tauri::AppHandle;
@@ -47,6 +51,27 @@ fn storage_load(key: String) -> Result<String, String> {
 }
 
 #[tauri::command]
+fn hardware_detect() -> HardwareInfo {
+    detect_hardware_tier()
+}
+
+#[tauri::command]
+async fn terminal_execute(
+    app: AppHandle,
+    cmd_str: String,
+    workspace_path: String,
+    perimeter_mode: bool,
+    timeout_secs: u64,
+) -> Result<ExecutionResult, String> {
+    let mode = if perimeter_mode {
+        SandboxMode::Perimeter
+    } else {
+        SandboxMode::SynchronizedCopy
+    };
+    execute_sandboxed_command(&cmd_str, &workspace_path, mode, timeout_secs, app).await
+}
+
+#[tauri::command]
 async fn send_chat_message(app: AppHandle, payload: SendChatPayload) -> Result<(), String> {
     let provider_name = payload.provider.to_lowercase();
     tokio::spawn(async move {
@@ -80,7 +105,9 @@ pub fn run() {
             edit_apply,
             crypto_unlock,
             storage_save,
-            storage_load
+            storage_load,
+            hardware_detect,
+            terminal_execute
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

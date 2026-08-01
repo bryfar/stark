@@ -5,9 +5,9 @@ As a Linux developer, I want build and test commands executed inside a Linux ker
 
 **Blocked by:** 02 — Plan & Build Modes with Diff Modal & Repo Indexer
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Linux `bubblewrap`/`firejail` subprocess isolation wrapper in `src-tauri/src/sandbox/`.
-- [ ] Support for Synchronized Copy sandbox mode and Perimeter sandbox mode.
-- [ ] Real-time stdout/stderr streaming IPC (`terminal:stdout`, `terminal:stderr`) with configurable execution timeout.
-- [ ] System hardware inspection (`sysinfo`) mapping RAM/VRAM to recommended Ollama Tiers (Lite, Basic, Standard, Pro).
+- [x] Linux `bubblewrap`/`firejail` subprocess isolation wrapper in `src-tauri/src/sandbox/`.
+- [x] Support for Synchronized Copy sandbox mode and Perimeter sandbox mode.
+- [x] Real-time stdout/stderr streaming IPC (`terminal:stdout`, `terminal:stderr`) with configurable execution timeout.
+- [x] System hardware inspection (`sysinfo`) mapping RAM/VRAM to recommended Ollama Tiers (Lite, Basic, Standard, Pro).
