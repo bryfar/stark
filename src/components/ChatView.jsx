@@ -1,13 +1,34 @@
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
 
-export function ChatView({ selectedModel, selectedProvider, agentMode, reasoning }) {
+export function ChatView({ selectedModel, selectedProvider, agentMode, reasoning, setProposedEdit, setProposedCommand }) {
   const [messages, setMessages] = useState([
     { sender: 'assistant', text: '¡Hola! Soy Crafter, tu agente ligero para Linux. ¿En qué te puedo ayudar hoy?' }
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [tokensUsed, setTokensUsed] = useState(0);
+  const [attachments, setAttachments] = useState([]);
+  const [availableSkills, setAvailableSkills] = useState([]);
+  const [selectedSkill, setSelectedSkill] = useState(null);
+
+  useEffect(() => {
+    async function loadSkills() {
+      try {
+        const { invoke } = await import('@tauri-apps/api/core');
+        const list = await invoke('skills_list', { workspacePath: '/home/bryan/Downloads/Repos/crafter-repo' });
+        setAvailableSkills(list);
+      } catch (e) {
+        setAvailableSkills([
+          { name: 'to-spec', description: 'Generar especificaciones PRD' },
+          { name: 'to-tickets', description: 'Generar tickets tracer-bullet' },
+          { name: 'code-review', description: 'Revisión en 2 ejes Standards / Spec' },
+          { name: 'implement', description: 'Desarrollar soluciones con TDD' }
+        ]);
+      }
+    }
+    loadSkills();
+  }, []);
 
   useEffect(() => {
     let unlisten;
@@ -66,13 +87,40 @@ export function ChatView({ selectedModel, selectedProvider, agentMode, reasoning
     };
   }, []);
 
-  const handleSend = async () => {
-    if (!input.trim() || isLoading) return;
+  const handleFileUpload = (e) => {
+    const files = Array.from(e.target.files);
+    const newAttachments = files.map((file) => {
+      if (file.size > 5 * 1024 * 1024) {
+        alert(`⚠️ El archivo ${file.name} excede el límite de 5MB`);
+        return null;
+      }
+      return {
+        name: file.name,
+        size: Math.round(file.size / 1024) + ' KB',
+        type: file.type || 'text/plain'
+      };
+    }).filter(Boolean);
 
-    const userMsg = { sender: 'user', text: input };
-    const currentInput = input;
+    setAttachments((prev) => [...prev, ...newAttachments]);
+  };
+
+  const handleSend = async () => {
+    if (!input.trim() && attachments.length === 0) return;
+    if (isLoading) return;
+
+    let fullPrompt = input;
+    if (selectedSkill) {
+      fullPrompt = `[Skill Activa: /${selectedSkill.name}]\n${fullPrompt}`;
+    }
+    if (attachments.length > 0) {
+      const attNames = attachments.map((a) => a.name).join(', ');
+      fullPrompt += `\n\n[Adjuntos incluidos: ${attNames}]`;
+    }
+
+    const userMsg = { sender: 'user', text: fullPrompt };
     setMessages((prev) => [...prev, userMsg]);
     setInput('');
+    setAttachments([]);
     setIsLoading(true);
 
     try {
@@ -81,7 +129,7 @@ export function ChatView({ selectedModel, selectedProvider, agentMode, reasoning
         role: m.sender === 'user' ? 'user' : 'assistant',
         content: m.text
       }));
-      chatMessages.push({ role: 'user', content: currentInput });
+      chatMessages.push({ role: 'user', content: fullPrompt });
 
       await invoke('send_chat_message', {
         payload: {
@@ -93,7 +141,6 @@ export function ChatView({ selectedModel, selectedProvider, agentMode, reasoning
         }
       });
     } catch (err) {
-      // Browser fallback simulation if not inside Tauri window
       setTimeout(() => {
         const modeBadge = agentMode === 'plan' ? '[Modo Plan - Solo Análisis]' : '[Modo Build - Edición Disco]';
         const reasoningBadge = reasoning ? ' (con CoT Reasoning)' : '';
@@ -101,7 +148,7 @@ export function ChatView({ selectedModel, selectedProvider, agentMode, reasoning
           ...prev,
           {
             sender: 'assistant',
-            text: `${modeBadge}${reasoningBadge}\nRespuesta de ${selectedProvider} (${selectedModel}):\n\nRecibí tu consulta: "${currentInput}". La inferencia local está lista.`
+            text: `${modeBadge}${reasoningBadge}\nRespuesta de ${selectedProvider} (${selectedModel}):\n\nProcesé tu mensaje con los adjuntos y habilidades indicadas.`
           }
         ]);
         setIsLoading(false);
@@ -127,19 +174,63 @@ export function ChatView({ selectedModel, selectedProvider, agentMode, reasoning
         {isLoading && (
           <div className="message-bubble assistant">
             <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>
-              {agentMode === 'plan' ? 'Analizando en Modo Plan...' : 'Generando propuesta en Modo Build...'}
+              {agentMode === 'plan' ? 'Analizando en Modo Plan...' : 'Generando respuesta en Modo Build...'}
             </span>
           </div>
         )}
       </div>
 
       <div className="chat-input-container">
+        {/* Barra de Skills y Adjuntos */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Skill:</span>
+          <select
+            style={{
+              fontSize: '12px',
+              padding: '2px 6px',
+              borderRadius: '4px',
+              background: '#313244',
+              color: '#cdd6f4',
+              border: '1px solid #45475a'
+            }}
+            value={selectedSkill ? selectedSkill.name : ''}
+            onChange={(e) => {
+              const skill = availableSkills.find((s) => s.name === e.target.value);
+              setSelectedSkill(skill || null);
+            }}
+          >
+            <option value="">Ninguna skill seleccionada</option>
+            {availableSkills.map((s) => (
+              <option key={s.name} value={s.name}>
+                /{s.name} — {s.description.slice(0, 35)}...
+              </option>
+            ))}
+          </select>
+
+          {attachments.map((att, i) => (
+            <span key={i} style={{ fontSize: '11px', background: '#45475a', padding: '2px 6px', borderRadius: '4px', color: '#a6e3a1' }}>
+              📄 {att.name} ({att.size})
+            </span>
+          ))}
+        </div>
+
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '12px', color: 'var(--text-muted)' }}>
           <span>Modo: <strong>{agentMode.toUpperCase()}</strong> | Proveedor: <strong>{selectedProvider}</strong> ({selectedModel})</span>
           <span>Tokens gastados: <strong>{tokensUsed}</strong></span>
         </div>
 
         <div className="chat-input-box">
+          <label style={{ cursor: 'pointer', padding: '6px 10px', fontSize: '16px', display: 'flex', alignItems: 'center' }}>
+            📎
+            <input
+              type="file"
+              multiple
+              style={{ display: 'none' }}
+              onChange={handleFileUpload}
+              accept=".txt,.pdf,.log,.md,.js,.ts,.rs,.png,.jpg,.jpeg"
+            />
+          </label>
+
           <textarea
             className="chat-textarea"
             placeholder={agentMode === 'plan' ? 'Pide un diagnóstico o plan de arquitectura...' : 'Pide una modificación o edición de código...'}

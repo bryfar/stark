@@ -5,8 +5,8 @@ As a developer, I want to load custom skills instruction files (markdown/JSON fr
 
 **Blocked by:** 01 — MVP Multi-Provider LLM Chat & UI Base
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Dynamic skills loader in Rust (`skills::loader`) searching workspace and global skill paths.
-- [ ] Multimodal attachments UI in ChatInputBox supporting drag-and-drop / selection of Text, PDF, Log, and Image files.
-- [ ] Attachment size validation and context injection prior to LLM request dispatch.
+- [x] Dynamic skills loader in Rust (`skills::loader`) searching workspace and global skill paths.
+- [x] Multimodal attachments UI in ChatInputBox supporting drag-and-drop / selection of Text, PDF, Log, and Image files.
+- [x] Attachment size validation and context injection prior to LLM request dispatch.

@@ -2,6 +2,7 @@ pub mod hardware;
 pub mod providers;
 pub mod repo;
 pub mod sandbox;
+pub mod skills;
 pub mod storage;
 
 use hardware::{detect_hardware_tier, HardwareInfo};
@@ -15,6 +16,7 @@ use repo::{
     ApplyEditPayload, EditResult,
 };
 use sandbox::{execute_sandboxed_command, ExecutionResult, SandboxMode};
+use skills::{get_skills, loader::SkillInfo, read_skill_content};
 use std::path::Path;
 use storage::{load_encrypted_value, save_encrypted_value, unlock_storage};
 use tauri::AppHandle;
@@ -53,6 +55,16 @@ fn storage_load(key: String) -> Result<String, String> {
 #[tauri::command]
 fn hardware_detect() -> HardwareInfo {
     detect_hardware_tier()
+}
+
+#[tauri::command]
+fn skills_list(workspace_path: String) -> Vec<SkillInfo> {
+    get_skills(&workspace_path)
+}
+
+#[tauri::command]
+fn skills_read(file_path: String) -> Result<String, String> {
+    read_skill_content(&file_path)
 }
 
 #[tauri::command]
@@ -107,7 +119,9 @@ pub fn run() {
             storage_save,
             storage_load,
             hardware_detect,
-            terminal_execute
+            terminal_execute,
+            skills_list,
+            skills_read
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
