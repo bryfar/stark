@@ -1,5 +1,6 @@
 pub mod providers;
 pub mod repo;
+pub mod storage;
 
 use providers::{
     types::SendChatPayload, AnthropicProvider, GeminiProvider, OllamaProvider, OpenAIProvider,
@@ -11,6 +12,7 @@ use repo::{
     ApplyEditPayload, EditResult,
 };
 use std::path::Path;
+use storage::{load_encrypted_value, save_encrypted_value, unlock_storage};
 use tauri::AppHandle;
 
 #[tauri::command]
@@ -27,6 +29,21 @@ fn repo_index(workspace_path: String) -> Result<Vec<FileNode>, String> {
 #[tauri::command]
 fn edit_apply(payload: ApplyEditPayload) -> Result<EditResult, String> {
     apply_edit(payload)
+}
+
+#[tauri::command]
+fn crypto_unlock(passphrase: String) -> Result<bool, String> {
+    unlock_storage(&passphrase)
+}
+
+#[tauri::command]
+fn storage_save(key: String, value: String) -> Result<bool, String> {
+    save_encrypted_value(&key, &value)
+}
+
+#[tauri::command]
+fn storage_load(key: String) -> Result<String, String> {
+    load_encrypted_value(&key)
 }
 
 #[tauri::command]
@@ -60,7 +77,10 @@ pub fn run() {
             greet,
             send_chat_message,
             repo_index,
-            edit_apply
+            edit_apply,
+            crypto_unlock,
+            storage_save,
+            storage_load
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

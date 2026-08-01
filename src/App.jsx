@@ -6,6 +6,7 @@ import { ChatView } from './components/ChatView';
 import { CodeView } from './components/CodeView';
 import { DesignView } from './components/DesignView';
 import { DiffModal } from './components/DiffModal';
+import { UnlockModal } from './components/UnlockModal';
 
 export function App() {
   const [currentMode, setMode] = useState('chat');
@@ -14,6 +15,7 @@ export function App() {
   const [agentMode, setAgentMode] = useState('plan');
   const [reasoning, setReasoning] = useState(true);
   const [proposedEdit, setProposedEdit] = useState(null);
+  const [isLocked, setIsLocked] = useState(false);
 
   const handleApproveEdit = async (edit) => {
     try {
@@ -71,6 +73,11 @@ export function App() {
         proposedEdit={proposedEdit}
         onApprove={handleApproveEdit}
         onReject={handleRejectEdit}
+      />
+
+      <UnlockModal
+        isOpen={isLocked}
+        onUnlock={() => setIsLocked(false)}
       />
     </div>
   );

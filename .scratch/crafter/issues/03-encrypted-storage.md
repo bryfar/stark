@@ -5,9 +5,9 @@ As a security-conscious developer, I want my API keys, chat histories, and appli
 
 **Blocked by:** 01 — MVP Multi-Provider LLM Chat & UI Base
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Argon2id master key derivation module in `src-tauri/src/storage/crypto.rs`.
-- [ ] AES-256-GCM encryption and decryption at rest for persistent JSON data on disk.
-- [ ] Linux Secret Service / libsecret Keyring integration for secure API credential storage.
-- [ ] P4 Unlock Modal for in-memory passphrase entry when Secret Service is unavailable.
+- [x] Argon2id master key derivation module in `src-tauri/src/storage/crypto.rs`.
+- [x] AES-256-GCM encryption and decryption at rest for persistent JSON data on disk.
+- [x] Linux Secret Service / libsecret Keyring integration for secure API credential storage.
+- [x] P4 Unlock Modal for in-memory passphrase entry when Secret Service is unavailable.
