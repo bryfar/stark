@@ -1,4 +1,5 @@
 :root {
+  --ui-scale: 1;
   --bg-dark: #090d16;
   --bg-card: #111827;
   --bg-sidebar: #0d111a;
@@ -26,6 +27,10 @@
 
   --transition-fast: 0.15s ease;
   --transition-normal: 0.25s ease;
+}
+
+html {
+  font-size: calc(14px * var(--ui-scale, 1));
 }
 
 * {
