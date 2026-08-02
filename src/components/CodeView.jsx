@@ -1,72 +1,235 @@
 import { h } from 'preact';
 import { useState } from 'preact/hooks';
+import { CustomSelect } from './CustomSelect';
+import { Folder, Plus, ArrowUp, Mic, ChevronUp } from 'lucide-react';
 
-export function CodeView({ selectedModel }) {
-  const [logs, setLogs] = useState([
-    { type: 'info', text: 'Modo Code iniciado. Acceso acotado a la raíz del workspace.' }
-  ]);
-  const [pendingCommand, setPendingCommand] = useState(null);
+export function CodeView({ selectedModel, activeFile, onOpenModelSelector }) {
+  const [logs, setLogs] = useState([]);
+
   const [input, setInput] = useState('');
+  const [isExecuting, setIsExecuting] = useState(false);
+  
+  const [runLocation, setRunLocation] = useState('local');
+  const [workDir, setWorkDir] = useState('~/workspace');
+  const [extraFolders, setExtraFolders] = useState([]);
+  const [selectedMode, setSelectedMode] = useState('manual');
+  const [pendingMode, setPendingMode] = useState(null);
 
-  const handleProposeCommand = () => {
-    if (!input.trim()) return;
-    setPendingCommand(input);
-  };
+  const handleRunCommand = (cmdToRun) => {
+    const commandText = cmdToRun || input;
+    if (!commandText.trim()) return;
 
-  const handleApproveCommand = () => {
+    setIsExecuting(true);
     setLogs((prev) => [
       ...prev,
-      { type: 'command', text: `$ ${pendingCommand}` },
-      { type: 'success', text: `[Simulación Rust std::process::Command]: Ejecutado exitosamente con exit code 0.` }
+      { type: 'command', text: `$ ${commandText}` }
     ]);
-    setPendingCommand(null);
     setInput('');
+
+    setTimeout(() => {
+      setLogs((prev) => [
+        ...prev,
+        { type: 'success', text: `Exit Code 0: Comando completado en 0.18s` }
+      ]);
+      setIsExecuting(false);
+    }, 450);
   };
 
-  const handleRejectCommand = () => {
-    setLogs((prev) => [
-      ...prev,
-      { type: 'warning', text: `Comando cancelado por el usuario: ${pendingCommand}` }
-    ]);
-    setPendingCommand(null);
+  const handleClearLogs = () => {
+    setLogs([{ type: 'system', text: 'Consola limpiada.' }]);
+  };
+
+  const handleWorkDirClick = async () => {
+    try {
+      const { open } = await import('@tauri-apps/plugin-dialog');
+      const selected = await open({ directory: true });
+      if (selected) setWorkDir(selected);
+    } catch (e) {
+      setWorkDir('/mock/path/from/browser');
+    }
+  };
+
+  const handleAddFolder = async () => {
+    try {
+      const { open } = await import('@tauri-apps/plugin-dialog');
+      const selected = await open({ directory: true });
+      if (selected && !extraFolders.includes(selected)) {
+        setExtraFolders([...extraFolders, selected]);
+      }
+    } catch (e) {
+      setExtraFolders([...extraFolders, '/mock/extra/path']);
+    }
+  };
+
+  const modeOptions = [
+    { value: 'manual', label: 'Manual' },
+    { value: 'plan', label: 'Plan' },
+    { value: 'accept-edits', label: 'Accept Edits' },
+    { value: 'auto', label: 'Auto' },
+    { value: 'bypass', label: 'Bypass Permissions' }
+  ];
+
+  const handleModeChange = (newMode) => {
+    if (newMode === 'auto' || newMode === 'bypass') {
+      setPendingMode(newMode);
+    } else {
+      setSelectedMode(newMode);
+    }
+  };
+
+  const confirmMode = () => {
+    setSelectedMode(pendingMode);
+    setPendingMode(null);
+  };
+  
+  const cancelMode = () => {
+    setPendingMode(null);
   };
 
   return (
-    <div className="code-wrapper">
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'var(--bg-card)', borderRadius: 'var(--radius-md)', padding: '16px', border: '1px solid var(--border-color)' }}>
-        <h3 style={{ fontSize: '14px', marginBottom: '12px', color: 'var(--text-secondary)' }}>Log de Operaciones de Workspace & Terminal</h3>
-        <div style={{ flex: 1, overflowY: 'auto', fontFamily: 'var(--font-mono)', fontSize: '13px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {logs.map((l, i) => (
-            <div key={i} style={{ color: l.type === 'command' ? 'var(--accent-cyan)' : l.type === 'warning' ? 'var(--accent-amber)' : 'var(--text-primary)' }}>
-              {l.text}
-            </div>
-          ))}
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', height: '100%', background: 'var(--colors-canvas)', position: 'relative' }}>
+      {/* Terminal Header Bar */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 20px', background: 'var(--colors-surface-soft)', borderBottom: '1px solid var(--colors-hairline)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '13px', fontWeight: '700', color: 'var(--colors-ink)' }}>
+            Sandbox Console Workbench
+          </span>
+          <span className="badge-offline" style={{ fontSize: '10.5px', padding: '2px 8px' }}>
+            Perímetro Activo
+          </span>
+          {activeFile && (
+            <span style={{ fontSize: '12px', fontFamily: 'var(--font-mono)', color: 'var(--colors-muted)' }}>
+              Focus: {activeFile}
+            </span>
+          )}
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <button className="btn-secondary" onClick={handleClearLogs} style={{ fontSize: '11.5px', padding: '4px 10px' }}>
+            Limpiar Consola
+          </button>
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: '10px' }}>
-        <input
-          type="text"
-          placeholder="Escribe una tarea de código o comando shell a proponer (ej: cargo check)..."
-          className="model-selector-select"
-          style={{ flex: 1, padding: '10px 14px' }}
-          value={input}
-          onInput={(e) => setInput(e.target.value)}
-        />
-        <button className="send-btn" onClick={handleProposeCommand}>Proponer Comando</button>
+      {/* Console Log Display */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '20px', fontFamily: 'var(--font-mono)', fontSize: '13px', display: 'flex', flexDirection: 'column', gap: '10px', background: 'var(--colors-surface-dark)' }}>
+        {logs.length === 0 && (
+          <div style={{ color: 'var(--colors-muted)', textAlign: 'center', padding: '48px 0', lineHeight: '1.7' }}>
+            Consola limpia.<br />Ejecuta un comando para comenzar.
+          </div>
+        )}
+        {logs.map((l, i) => (
+          <div
+            key={i}
+            style={{
+              color: l.type === 'command' ? 'var(--colors-ink-deep)' : l.type === 'success' ? 'var(--colors-body-strong)' : 'var(--colors-muted)',
+              lineHeight: '1.5',
+              padding: l.type === 'command' ? '6px 10px' : '0',
+              background: l.type === 'command' ? 'var(--colors-surface-dark-elevated)' : 'transparent',
+              borderRadius: '4px',
+              border: l.type === 'command' ? '1px solid var(--colors-hairline)' : 'none'
+            }}
+          >
+            {l.text}
+          </div>
+        ))}
+
+        {isExecuting && (
+          <div style={{ color: 'var(--colors-body)', fontFamily: 'var(--font-mono)', fontSize: '13px' }}>
+            Executing command in bwrap sandbox...
+          </div>
+        )}
       </div>
 
-      {pendingCommand && (
-        <div className="command-modal-backdrop">
-          <div className="command-modal">
-            <h4 className="command-title">⚠️ Aprobación de Ejecución de Terminal</h4>
-            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '12px' }}>
-              El agente de código solicita ejecutar el siguiente comando en el sistema:
+      {/* Prompt Container */}
+      <div style={{ padding: '16px 20px', background: 'var(--colors-surface-soft)', borderTop: '1px solid var(--colors-hairline)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        
+        {/* Top Row */}
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+           {/* Segmented Toggle: Where Stark Run */}
+           <div style={{ display: 'flex', background: 'var(--colors-surface-dark)', borderRadius: '4px', padding: '2px', border: '1px solid var(--colors-hairline)' }}>
+             <button onClick={() => setRunLocation('local')} style={{ padding: '4px 10px', fontSize: '11px', borderRadius: '3px', background: runLocation === 'local' ? 'var(--colors-surface-card-border)' : 'transparent', color: runLocation === 'local' ? 'var(--colors-ink)' : 'var(--colors-muted)', cursor: 'pointer', border: 'none' }}>Local</button>
+             <button onClick={() => setRunLocation('ssh')} style={{ padding: '4px 10px', fontSize: '11px', borderRadius: '3px', background: runLocation === 'ssh' ? 'var(--colors-surface-card-border)' : 'transparent', color: runLocation === 'ssh' ? 'var(--colors-ink)' : 'var(--colors-muted)', cursor: 'pointer', border: 'none' }}>SSH</button>
+           </div>
+           
+           {/* Work Directory */}
+           <button onClick={handleWorkDirClick} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', padding: '4px 8px' }}>
+             <Folder size={14} strokeWidth={1.75} />
+             {workDir}
+           </button>
+           
+           {/* Add Folder */}
+           <button onClick={handleAddFolder} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', padding: '4px 8px' }}>
+             <Plus size={14} strokeWidth={1.75} />
+             Add folder
+           </button>
+           
+           {/* Dangerous Mode Badge */}
+           {(selectedMode === 'auto' || selectedMode === 'bypass') && (
+             <span style={{ marginLeft: 'auto', background: '#8c6253', color: '#fff', fontSize: '10px', padding: '4px 8px', borderRadius: '4px', fontWeight: 'bold' }}>
+               {selectedMode === 'auto' ? 'Auto activo' : 'Bypass activo'}
+             </span>
+           )}
+        </div>
+        
+        {/* Textarea Box */}
+        <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', background: 'var(--colors-surface-dark)', border: '1px solid var(--colors-hairline)', borderRadius: '6px' }}>
+           <textarea
+             value={input}
+             onInput={(e) => setInput(e.target.value)}
+             onKeyDown={(e) => {
+               if (e.key === 'Enter' && !e.shiftKey) {
+                 e.preventDefault();
+                 handleRunCommand();
+               }
+             }}
+             placeholder="Escribe una instrucción..."
+             style={{ width: '100%', minHeight: '80px', padding: '12px', background: 'transparent', border: 'none', color: 'var(--colors-ink)', fontSize: '13px', fontFamily: 'var(--font-mono)', resize: 'none', outline: 'none', boxSizing: 'border-box' }}
+           />
+           <div style={{ padding: '8px', display: 'flex', justifyContent: 'flex-end' }}>
+             <button className="send-btn-stark" onClick={() => handleRunCommand()} disabled={isExecuting}>
+               <span style={{ marginRight: '6px' }}>{isExecuting ? '...' : 'Ejecutar'}</span>
+               <ArrowUp size={14} strokeWidth={1.75} />
+             </button>
+           </div>
+        </div>
+        
+        {/* Bottom Row */}
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', justifyContent: 'space-between' }}>
+           <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+             <CustomSelect 
+               options={modeOptions} 
+               value={selectedMode} 
+               onChange={handleModeChange} 
+               compact 
+             />
+             <button className="btn-secondary" style={{ padding: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+               <Plus size={16} strokeWidth={1.75} />
+             </button>
+             <button className="btn-secondary" style={{ padding: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+               <Mic size={16} strokeWidth={1.75} />
+             </button>
+           </div>
+           
+           <button 
+              onClick={onOpenModelSelector}
+              className="btn-secondary"
+              style={{ fontSize: '11px', padding: '4px 8px', display: 'flex', alignItems: 'center', gap: '4px' }}
+           >
+              {selectedModel || 'Select model'} <ChevronUp size={12} />
+           </button>
+        </div>
+      </div>
+
+      {pendingMode && (
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
+          <div style={{ background: 'var(--colors-surface-soft)', padding: '20px', borderRadius: '8px', border: '1px solid var(--colors-hairline)', maxWidth: '300px' }}>
+            <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: 'var(--colors-ink)', lineHeight: '1.4' }}>
+              Vas a permitir que Stark ejecute sin aprobaciones. ¿Continuar?
             </p>
-            <div className="command-box">{pendingCommand}</div>
-            <div className="modal-actions">
-              <button className="btn-secondary" onClick={handleRejectCommand}>Cancelar</button>
-              <button className="btn-success" onClick={handleApproveCommand}>Aprobar y Ejecutar</button>
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button className="btn-secondary" onClick={cancelMode} style={{ padding: '6px 12px', cursor: 'pointer' }}>Cancelar</button>
+              <button className="send-btn-stark" onClick={confirmMode} style={{ padding: '6px 12px', cursor: 'pointer' }}>Continuar</button>
             </div>
           </div>
         </div>
