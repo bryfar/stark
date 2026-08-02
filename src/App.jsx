@@ -8,9 +8,12 @@ import { DesignView } from './components/DesignView';
 import { DiffModal } from './components/DiffModal';
 import { UnlockModal } from './components/UnlockModal';
 import { TerminalModal } from './components/TerminalModal';
+import { ProjectsPage } from './components/pages/ProjectsPage';
 
 export function App() {
   const [currentMode, setMode] = useState('chat');
+  const [isMaximized, setIsMaximized] = useState(true);
+  const [activePage, setActivePage] = useState('home');
   const [selectedProvider, setSelectedProvider] = useState('ollama');
   const [selectedModel, setSelectedModel] = useState('qwen2.5:1.5b');
   const [agentMode, setAgentMode] = useState('plan');
@@ -54,7 +57,14 @@ export function App() {
 
   return (
     <div style={{ display: 'flex', width: '100vw', height: '100vh' }}>
-      <Sidebar currentMode={currentMode} setMode={setMode} />
+      <Sidebar 
+        currentMode={currentMode} 
+        setMode={setMode} 
+        isMaximized={isMaximized}
+        setIsMaximized={setIsMaximized}
+        activePage={activePage}
+        setActivePage={setActivePage}
+      />
       
       <main className="app-main">
         <HeaderBar
@@ -69,18 +79,29 @@ export function App() {
         />
 
         <div className="view-container">
-          {currentMode === 'chat' && (
-            <ChatView
-              selectedModel={selectedModel}
-              selectedProvider={selectedProvider}
-              agentMode={agentMode}
-              reasoning={reasoning}
-              setProposedEdit={setProposedEdit}
-              setProposedCommand={setProposedCommand}
-            />
+          {activePage === 'projects' ? (
+            <ProjectsPage />
+          ) : activePage !== 'home' ? (
+            <div style={{ padding: '24px', color: 'var(--text-primary)' }}>
+              <h2>{activePage}</h2>
+              <p style={{ color: 'var(--text-muted)' }}>Esta página está en construcción.</p>
+            </div>
+          ) : (
+            <>
+              {currentMode === 'chat' && (
+                <ChatView
+                  selectedModel={selectedModel}
+                  selectedProvider={selectedProvider}
+                  agentMode={agentMode}
+                  reasoning={reasoning}
+                  setProposedEdit={setProposedEdit}
+                  setProposedCommand={setProposedCommand}
+                />
+              )}
+              {currentMode === 'code' && <CodeView selectedModel={selectedModel} />}
+              {currentMode === 'design' && <DesignView />}
+            </>
           )}
-          {currentMode === 'code' && <CodeView selectedModel={selectedModel} />}
-          {currentMode === 'design' && <DesignView />}
         </div>
       </main>
 
