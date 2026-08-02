@@ -4,13 +4,15 @@ use aes_gcm::{
 };
 use argon2::{
     password_hash::SaltString,
-    Argon2,
+    Algorithm, Argon2, Params, Version,
 };
 use rand::RngCore;
 
 pub fn derive_key_argon2(passphrase: &str, salt: &[u8; 16]) -> Result<[u8; 32], String> {
     let mut key = [0u8; 32];
-    let argon2 = Argon2::default();
+    let params = Params::new(19 * 1024, 1, 1, Some(32))
+        .map_err(|e| format!("Error creando parámetros Argon2id: {}", e))?;
+    let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, params);
     let salt_str = match SaltString::encode_b64(salt) {
         Ok(s) => s,
         Err(err) => return Err(format!("Error codificando sal Argon2: {}", err)),

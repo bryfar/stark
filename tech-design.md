@@ -16,8 +16,8 @@ crafter-repo/
 │   │   ├── main.rs          # Entrypoint Tauri
 │   │   ├── lib.rs
 │   │   ├── providers/       # Adaptadores LLM
-│   │   │   ├── mod.rs
-│   │   │   ├── openai.rs
+│   │   │   ├── mod.rs       # Trait Provider + OpenAICompatibleProvider genérico
+│   │   │   ├── types.rs     # ProviderConfig, ProviderKind, LocalModelInfo
 │   │   │   ├── anthropic.rs
 │   │   │   ├── gemini.rs
 │   │   │   └── ollama.rs
@@ -36,9 +36,10 @@ crafter-repo/
 │   │   ├── repo/            # Index (tree) del repositorio
 │   │   │   ├── mod.rs
 │   │   │   └── indexer.rs
-│   │   ├── storage/         # Conversaciones cifradas, config
+│   │   ├── storage/         # Conversaciones cifradas, config, providers
 │   │   │   ├── mod.rs
-│   │   │   └── encrypted_store.rs
+│   │   │   ├── encrypted_store.rs
+│   │   │   └── providers_store.rs  # Lista de providers + API keys (AES-256-GCM)
 │   │   └── sandbox/         # bubblewrap/firejail
 │   │       ├── mod.rs
 │   │       ├── copy.rs      # Modo copia sincronizada
@@ -63,12 +64,19 @@ crafter-repo/
 ### Providers (adaptadores LLM)
 - Trait `Provider` con métodos: `chat_stream`, `chat` (no-stream), `models()`, `usage()`.
 - Cada adaptador traduce al formato del proveedor:
-  - **OpenAI:** API `/chat/completions` (streaming SSE).
+  - **OpenAICompatible (genérico):** POST `{base_url}/chat/completions` (streaming SSE) con `Bearer` — cubre OpenAI, Groq, OpenRouter, LM Studio, Ollama (endpoint `/v1`).
   - **Anthropic:** API `/messages` (streaming SSE, header `anthropic-version`).
   - **Gemini:** API `generateContent`/`streamGenerateContent` (SDK o REST).
   - **Ollama:** API local `/api/chat` (OpenAI-compatible + nativa), modo solo-local.
 - **Streaming:** eventos `token`, `usage`, `done` → eventos Tauri `emit` a la UI.
 - **Tokens:** usa los `usage` reportados por cada proveedor (informativo).
+
+### Gestión de proveedores (multi-provider configurable)
+- Los providers son **datos gestionables por el usuario**: nombre, tipo, `base_url`, lista de modelos y API key opcional.
+- Persistidos cifrados (AES-256-GCM) en `storage::providers_store` → `.crafter_storage/providers_list.enc` + `api_key_{id}.enc`.
+- Presets precargados: Ollama, OpenAI, Anthropic, Gemini, Groq, OpenRouter, Mistral, LM Studio.
+- **Modelos locales (Ollama):** `providers_detect_models` consulta `GET /api/tags`; `providers_install_model` ejecuta `ollama pull <model>` vía `tokio::process::Command`.
+- `send_chat_message` enruta dinámico: Anthropic/Gemini a sus adaptadores; el resto al adapter OpenAI-compatible usando `base_url` + API key guardados.
 
 ### Agent (plan/build)
 - **Plan mode:** construye contexto (tree + archivos relevantes), pide análisis/plan al LLM, NO edita.
@@ -100,6 +108,7 @@ crafter-repo/
 
 - **Chat:** lista de mensajes con streaming de tokens (markdown + código).
 - **Toggle LLM:** proveedor + modelo + modo de razonamiento (persistido en config cifrada).
+- **ProviderManagerModal:** modal de gestión de proveedores (form nombre/tipo/base_url/modelos/API key), presets precargados y catálogo de modelos locales con detección + botón Instalar (`ollama pull`).
 - **Modo Plan/Build:** switcher de modo.
 - **Diff/APproval:** panel de aprobación de acciones (ediciones, comandos) con diff visible.
 - **Contador de tokens** por sesión.
@@ -109,13 +118,14 @@ crafter-repo/
 
 ## Flujo de datos principal (chat)
 
-1. UI envía mensaje → `command chat:send` (Rust).
-2. Rust construye contexto: `repo:index` + `repo:relevant` + adjuntos + skills.
-3. `agent` decide modo (Plan/Build).
-4. `provider:chat_stream` → eventos `token` → UI renderiza streaming.
-5. En Build mode: el agente emite `action:propose` → UI muestra diff → usuario aprueba →
+1. UI envía mensaje → `command chat:send` (Rust), con `provider_id` + `model` seleccionados.
+2. Rust carga la config del provider desde `providers_store` (base_url + API key) y resuelve el adaptador (Anthropic/Gemini/OpenAI-compatible/Ollama).
+3. Rust construye contexto: `repo:index` + `repo:relevant` + adjuntos + skills.
+4. `agent` decide modo (Plan/Build).
+5. `provider:chat_stream` → eventos `token` → UI renderiza streaming.
+6. En Build mode: el agente emite `action:propose` → UI muestra diff → usuario aprueba →
    `edit:apply` → log de cambios.
-6. `provider:usage` → UI actualiza contador de tokens.
+7. `provider:usage` → UI actualiza contador de tokens.
 
 ## Dependencias Rust candidatas
 

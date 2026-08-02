@@ -16,8 +16,11 @@ antiguo y en los dispositivos más modestos, sin importar que no sean antiguos.
 
 ### Modelo-agnóstico
 - Conectar a OpenAI, Anthropic, Google Gemini y modelos locales vía Ollama, seleccionables por sesión.
-- **Toggle de selección de LLM** en la UI.
+- **Proveedores gestionables** por el usuario: crear/editar/eliminar configs (nombre, tipo, base_url, modelos, API key opcional) desde un modal con presets precargados; persistidos cifrados.
+- **Adapter OpenAI-compatible genérico** para la mayoría de proveedores + adaptadores propietarios para Anthropic y Gemini.
+- **Toggle de selección de LLM** en la UI (alimentado desde la config guardada).
 - **Selección de modelo dentro del proveedor** (p. ej. o1-mini vs gpt-4o en OpenAI; claude-thinking vs claude-sonnet en Anthropic).
+- **Modelos locales Ollama:** detección de los instalados (GET `/api/tags`) y botón para instalar catálogo recomendado (`ollama pull`).
 
 ### Estilo de respuesta
 - El agente **razona paso a paso antes de responder**, para cualquier modelo (mediante system prompt / chain-of-thought en el prompt).

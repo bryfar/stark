@@ -1,7 +1,7 @@
 pub mod types;
 
 use async_trait::async_trait;
-use types::{ChatMessage, SendChatPayload, StreamEvent, TokenUsage};
+use types::{SendChatPayload, StreamEvent, TokenUsage};
 use tauri::{AppHandle, Emitter};
 
 #[async_trait]
@@ -17,6 +17,10 @@ pub struct OllamaProvider;
 pub struct OpenAIProvider;
 pub struct AnthropicProvider;
 pub struct GeminiProvider;
+pub struct OpenAICompatibleProvider {
+    pub base_url: String,
+    pub api_key: Option<String>,
+}
 
 #[async_trait]
 impl Provider for OllamaProvider {
@@ -265,6 +269,81 @@ impl Provider for GeminiProvider {
                     token: None,
                     usage: None,
                     error: Some(format!("Gemini request failed: {}", err)),
+                    done: false,
+                });
+            }
+        }
+
+        let _ = app.emit("chat-token", StreamEvent {
+            token: None,
+            usage: None,
+            error: None,
+            done: true,
+        });
+
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl Provider for OpenAICompatibleProvider {
+    async fn chat_stream(
+        &self,
+        payload: SendChatPayload,
+        app: AppHandle,
+    ) -> Result<(), String> {
+        let api_key = self
+            .api_key
+            .clone()
+            .or(payload.api_key)
+            .unwrap_or_default();
+        let base = self.base_url.trim_end_matches('/').to_string();
+        let url = format!("{}/chat/completions", base);
+        let client = reqwest::Client::new();
+        let body = serde_json::json!({
+            "model": payload.model,
+            "messages": payload.messages,
+        });
+
+        let mut req = client.post(&url).json(&body);
+        if !api_key.is_empty() {
+            req = req.header("Authorization", format!("Bearer {}", api_key));
+        }
+
+        let res = req.send().await;
+
+        match res {
+            Ok(resp) => {
+                if let Ok(json) = resp.json::<serde_json::Value>().await {
+                    if let Some(err_msg) = json["error"]["message"].as_str() {
+                        let _ = app.emit("chat-token", StreamEvent {
+                            token: None,
+                            usage: None,
+                            error: Some(format!("{}: {}", base, err_msg)),
+                            done: false,
+                        });
+                    } else if let Some(content) = json["choices"][0]["message"]["content"].as_str() {
+                        let prompt_tokens = json["usage"]["prompt_tokens"].as_u64().unwrap_or(0) as u32;
+                        let completion_tokens = json["usage"]["completion_tokens"].as_u64().unwrap_or(0) as u32;
+
+                        let _ = app.emit("chat-token", StreamEvent {
+                            token: Some(content.to_string()),
+                            usage: Some(TokenUsage {
+                                prompt_tokens,
+                                completion_tokens,
+                                total_tokens: prompt_tokens + completion_tokens,
+                            }),
+                            error: None,
+                            done: false,
+                        });
+                    }
+                }
+            }
+            Err(err) => {
+                let _ = app.emit("chat-token", StreamEvent {
+                    token: None,
+                    usage: None,
+                    error: Some(format!("{} request failed: {}", base, err)),
                     done: false,
                 });
             }

@@ -1,4 +1,10 @@
 pub mod crypto;
+pub mod providers_store;
+
+pub use providers_store::{
+    delete_provider, get_provider, load_api_key, load_providers, parse_kind, preset_providers,
+    save_api_key, save_providers, upsert_provider,
+};
 
 use crypto::{decrypt_aes_gcm, derive_key_argon2, encrypt_aes_gcm};
 use std::fs;
@@ -7,6 +13,14 @@ use std::sync::Mutex;
 
 static MEMORY_KEY: Mutex<Option<[u8; 32]>> = Mutex::new(None);
 static FIXED_SALT: [u8; 16] = [15, 24, 33, 42, 51, 60, 79, 88, 97, 106, 115, 124, 133, 142, 151, 160];
+
+pub fn get_storage_master_key() -> Result<[u8; 32], String> {
+    let lock = MEMORY_KEY.lock().map_err(|e| e.to_string())?;
+    match *lock {
+        Some(k) => Ok(k),
+        None => Err("El almacenamiento no está desbloqueado. Ingrese la clave maestra.".to_string()),
+    }
+}
 
 pub fn unlock_storage(passphrase: &str) -> Result<bool, String> {
     let derived = derive_key_argon2(passphrase, &FIXED_SALT)?;

@@ -4,19 +4,23 @@
   "version": "0.1.0",
   "identifier": "com.crafter.app",
   "build": {
-    "beforeDevCommand": "npm run dev",
+    "beforeDevCommand": "bun run dev",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "npm run build",
+    "beforeBuildCommand": "bun run build",
     "frontendDist": "../dist"
   },
   "app": {
     "windows": [
       {
-        "title": "Crafter Desktop AI Agent",
+        "title": "Stark",
         "width": 1100,
         "height": 720,
+        "minWidth": 460,
+        "minHeight": 560,
         "resizable": true,
-        "fullscreen": false
+        "fullscreen": false,
+        "decorations": false,
+        "maximized": true
       }
     ],
     "security": {

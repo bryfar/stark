@@ -1,135 +1,165 @@
 import { h } from 'preact';
-import { useState, useEffect } from 'preact/hooks';
+import { PanelLeftClose, PanelLeftOpen, Stethoscope, MessageSquare, Code2, Layout, Sun, Moon, Minus, Square, X } from 'lucide-react';
 
-export function HeaderBar({
-  selectedModel,
-  setSelectedModel,
-  selectedProvider,
-  setSelectedProvider,
-  agentMode,
-  setAgentMode,
-  reasoning,
-  setReasoning,
-}) {
-  const [hardwareTier, setHardwareTier] = useState('Detectando...');
+export function HeaderBar({ currentMode, setMode, onOpenDoctor, isSidebarOpen, onToggleSidebar, theme, onToggleTheme }) {
+  const modes = [
+    { id: 'chat', label: 'Chat General', icon: MessageSquare },
+    { id: 'code', label: 'Modo Code', icon: Code2 },
+    { id: 'design', label: 'Modo Design', icon: Layout }
+  ];
 
-  useEffect(() => {
-    async function loadHardware() {
-      try {
-        const { invoke } = await import('@tauri-apps/api/core');
-        const info = await invoke('hardware_detect');
-        setHardwareTier(`${info.tier} (${Math.round(info.total_ram_mb / 1024)}GB RAM)`);
-      } catch (e) {
-        setHardwareTier('Standard (16GB RAM)');
-      }
+  const windowAction = async (action) => {
+    try {
+      const { getCurrentWindow } = await import('@tauri-apps/api/window');
+      const win = getCurrentWindow();
+      if (action === 'minimize') await win.minimize();
+      else if (action === 'maximize') await win.toggleMaximize();
+      else if (action === 'close') await win.close();
+    } catch (e) {
+      // Browser preview: no Tauri window API
     }
-    loadHardware();
-  }, []);
+  };
 
   return (
-    <header className="header-bar">
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-        <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Proveedor:</span>
-        <select
-          className="model-selector-select"
-          value={selectedProvider}
-          onChange={(e) => {
-            const prov = e.target.value;
-            setSelectedProvider(prov);
-            if (prov === 'ollama') setSelectedModel('qwen2.5:1.5b');
-            else if (prov === 'openai') setSelectedModel('gpt-4o');
-            else if (prov === 'anthropic') setSelectedModel('claude-3-5-sonnet-20241022');
-            else if (prov === 'gemini') setSelectedModel('gemini-1.5-flash');
+    <header className="header-bar" data-tauri-drag-region>
+      {/* Sidebar Toggle & Brand Badge */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <button
+          onClick={onToggleSidebar}
+          title={isSidebarOpen ? 'Ocultar Sidebar' : 'Mostrar Sidebar'}
+          style={{
+            fontSize: '12px',
+            fontFamily: 'var(--font-mono)',
+            padding: '5px 10px',
+            background: 'var(--colors-surface-dark)',
+            color: 'var(--colors-body-strong)',
+            borderRadius: '4px',
+            border: '1px solid var(--colors-hairline)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px'
           }}
         >
-          <option value="ollama">Ollama (Local http://localhost:11434)</option>
-          <option value="openai">OpenAI (Cloud API)</option>
-          <option value="anthropic">Anthropic (Claude API)</option>
-          <option value="gemini">Google Gemini (API)</option>
-        </select>
+          {isSidebarOpen ? <PanelLeftClose size={14} strokeWidth={1.75} /> : <PanelLeftOpen size={14} strokeWidth={1.75} />}
+          <span>Sidebar</span>
+        </button>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <span className="header-brand" style={{ fontFamily: 'var(--font-mono)', fontSize: '13px', fontWeight: '700', color: 'var(--colors-ink)' }}>
+            Stark Workspace
+          </span>
+        </div>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-        <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Modelo:</span>
-        <select
-          className="model-selector-select"
-          value={selectedModel}
-          onChange={(e) => setSelectedModel(e.target.value)}
+      {/* Centered Workspace Mode Tabs */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        {modes.map((m) => {
+          const isActive = currentMode === m.id;
+          const IconComp = m.icon;
+          return (
+            <button
+              key={m.id}
+              onClick={() => setMode(m.id)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '6px 18px',
+                borderRadius: '4px',
+                border: isActive ? '1px solid var(--colors-hairline-strong)' : '1px solid transparent',
+                background: isActive ? 'var(--colors-surface-card)' : 'transparent',
+                color: isActive ? 'var(--colors-ink-deep)' : 'var(--colors-body)',
+                fontFamily: 'var(--font-mono)',
+                fontSize: '13px',
+                fontWeight: isActive ? '600' : '400',
+                cursor: 'pointer',
+                transition: 'all var(--transition-fast)'
+              }}
+            >
+              <IconComp size={14} strokeWidth={1.75} style={{ color: isActive ? 'var(--colors-ink-deep)' : 'var(--colors-muted)' }} />
+              <span className="header-mode-label">{m.label}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Theme Switcher & System Diagnostic Trigger */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <button
+          onClick={onToggleTheme}
+          title="Alternar Tema (Dark Monocromo ↔ Open Design Light)"
+          style={{
+            fontSize: '12px',
+            fontFamily: 'var(--font-mono)',
+            padding: '5px 10px',
+            background: 'var(--colors-surface-dark)',
+            color: 'var(--colors-body-strong)',
+            borderRadius: '4px',
+            border: '1px solid var(--colors-hairline)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px'
+          }}
         >
-          {selectedProvider === 'ollama' && (
-            <>
-              <option value="qwen2.5:1.5b">Qwen 2.5 1.5B (Lite Q4)</option>
-              <option value="llama3.2:3b">Llama 3.2 3B (Basic Q4)</option>
-              <option value="phi3:mini">Phi-3 Mini (3.8B)</option>
-              <option value="deepseek-coder:6.7b">DeepSeek Coder 6.7B</option>
-            </>
-          )}
-          {selectedProvider === 'openai' && (
-            <>
-              <option value="gpt-4o">GPT-4o</option>
-              <option value="gpt-4o-mini">GPT-4o Mini</option>
-              <option value="o1-mini">o1-mini (Reasoning)</option>
-            </>
-          )}
-          {selectedProvider === 'anthropic' && (
-            <>
-              <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet</option>
-              <option value="claude-3-5-haiku-20241022">Claude 3.5 Haiku</option>
-            </>
-          )}
-          {selectedProvider === 'gemini' && (
-            <>
-              <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
-              <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
-            </>
-          )}
-        </select>
-      </div>
+          {theme === 'light' ? <Moon size={14} strokeWidth={1.75} /> : <Sun size={14} strokeWidth={1.75} />}
+          <span>{theme === 'light' ? 'Dark' : 'Light'}</span>
+        </button>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginLeft: 'auto' }}>
-        <span style={{ fontSize: '11px', padding: '3px 8px', background: '#313244', color: '#a6e3a1', borderRadius: '12px' }}>
-          🖥️ Tier: {hardwareTier}
-        </span>
+        <button
+          onClick={onOpenDoctor}
+          style={{
+            fontSize: '12px',
+            fontFamily: 'var(--font-mono)',
+            padding: '5px 12px',
+            background: 'var(--colors-surface-dark)',
+            color: 'var(--colors-body-strong)',
+            borderRadius: '4px',
+            border: '1px solid var(--colors-hairline)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px'
+          }}
+        >
+          <Stethoscope size={14} strokeWidth={1.75} />
+          <span>Stark Doctor</span>
+        </button>
 
-        <label style={{ fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
-          <input
-            type="checkbox"
-            checked={reasoning}
-            onChange={(e) => setReasoning(e.target.checked)}
-          />
-          CoT Reasoning
-        </label>
-
-        <div style={{ display: 'flex', background: 'var(--surface-color)', padding: '2px', borderRadius: '6px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '2px', marginLeft: '8px', borderLeft: '1px solid var(--colors-hairline)', paddingLeft: '8px' }}>
           <button
-            className={`btn-mode ${agentMode === 'plan' ? 'active' : ''}`}
-            onClick={() => setAgentMode('plan')}
+            onClick={() => windowAction('minimize')}
+            aria-label="Minimizar"
             style={{
-              padding: '4px 10px',
-              fontSize: '12px',
-              border: 'none',
-              borderRadius: '4px',
-              background: agentMode === 'plan' ? 'var(--primary-color)' : 'transparent',
-              color: agentMode === 'plan' ? '#fff' : 'var(--text-secondary)',
-              cursor: 'pointer'
+              width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'transparent', border: 'none', borderRadius: '4px', cursor: 'pointer',
+              color: 'var(--colors-body-strong)'
             }}
           >
-            Modo Plan
+            <Minus size={14} strokeWidth={1.75} />
           </button>
           <button
-            className={`btn-mode ${agentMode === 'build' ? 'active' : ''}`}
-            onClick={() => setAgentMode('build')}
+            onClick={() => windowAction('maximize')}
+            aria-label="Maximizar"
             style={{
-              padding: '4px 10px',
-              fontSize: '12px',
-              border: 'none',
-              borderRadius: '4px',
-              background: agentMode === 'build' ? 'var(--primary-color)' : 'transparent',
-              color: agentMode === 'build' ? '#fff' : 'var(--text-secondary)',
-              cursor: 'pointer'
+              width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'transparent', border: 'none', borderRadius: '4px', cursor: 'pointer',
+              color: 'var(--colors-body-strong)'
             }}
           >
-            Modo Build
+            <Square size={12} strokeWidth={1.75} />
+          </button>
+          <button
+            onClick={() => windowAction('close')}
+            aria-label="Cerrar"
+            style={{
+              width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'transparent', border: 'none', borderRadius: '4px', cursor: 'pointer',
+              color: 'var(--colors-body-strong)'
+            }}
+          >
+            <X size={15} strokeWidth={1.75} />
           </button>
         </div>
       </div>

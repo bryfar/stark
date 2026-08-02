@@ -28,6 +28,20 @@ Se ha completado el proceso de entrevista (*grilling*) para definir la arquitect
 
 ---
 
+## 6. Módulo de Proveedores LLM (sesión grill-me reciente)
+
+Decisiones acordadas en la sesión de grilling sobre el multi-provider:
+
+- **Arquitectura:** Opción 01+03 **híbrida** — un adapter **OpenAI-compatible genérico** (`OpenAICompatibleProvider` en `providers/mod.rs`) que cubre la mayoría de proveedores (OpenAI, Groq, OpenRouter, LM Studio, Ollama vía `/v1`) + adaptadores propietarios solo para Anthropic y Gemini.
+- **Persistencia:** JSON cifrado en `.crafter_storage/` (`providers_list.enc` + `api_key_{id}.enc`), AES-256-GCM con clave maestra compartida (`get_storage_master_key`).
+- **Modelos:** lista libre por proveedor (sin fetch automático de catálogos) + **auto-detección** de modelos locales Ollama (GET `/api/tags`) con botón para instalar (`ollama pull`).
+- **UI:** el modal de gestión (ProviderManagerModal) se abre desde un **botón engranaje junto al selector de proveedor** en el prompt; nunca es un modal de arranque.
+- **Campos del provider:** nombre, tipo (openai_compatible / anthropic / gemini / ollama), `base_url`, modelos (textarea), **API key opcional**.
+- **Presets editables** precargados: Ollama, OpenAI, Anthropic, Gemini, Groq, OpenRouter, Mistral, LM Studio.
+- **API key:** se guarda cifrada y el backend la **recupera automáticamente en cada envío** (no viaja por la UI).
+
+---
+
 ## Estrategia de Construcción (Paso a Paso)
 
 1. **Paso 1:** Inicializar la estructura de Tauri v2 con Preact + Vite.

@@ -67,8 +67,14 @@ Permite conectar alternativamente a OpenAI, Anthropic, Google Gemini y modelos l
         ) -> Result<(), String>;
     }
     ```
-  - Implementaciones concretas para `OpenAIProvider`, `AnthropicProvider`, `GeminiProvider` y `OllamaProvider`.
+  - Implementaciones concretas: `OpenAICompatibleProvider` (genérico, POST `{base_url}/chat/completions`), `AnthropicProvider`, `GeminiProvider` y `OllamaProvider`.
   - Contrato de comunicación vía Tauri Emitter emitiendo eventos `chat-token` con la estructura `StreamEvent` (`token`, `usage`, `error`, `done`).
+
+- **`storage::providers_store` (multi-provider gestionable):**
+  - Lista de providers editables por el usuario: `ProviderConfig { id, name, kind, base_url, models[], api_key? }`.
+  - Persistencia cifrada AES-256-GCM en `.crafter_storage/` (`providers_list.enc` + `api_key_{id}.enc`), clave maestra compartida con `storage::mod`.
+  - Presets precargados: Ollama, OpenAI, Anthropic, Gemini, Groq, OpenRouter, Mistral, LM Studio.
+  - Modelos locales: `providers_detect_models` (GET `/api/tags` en Ollama) y `providers_install_model` (`ollama pull`).
 
 - **`sandbox::*` Module:**
   - Integración con comandos `bubblewrap` / `firejail` en Linux.
@@ -95,11 +101,17 @@ Permite conectar alternativamente a OpenAI, Anthropic, Google Gemini y modelos l
 
 | Comando Tauri | Dirección | Payload Entrada | Eventos Emitidos |
 |---------------|-----------|-----------------|------------------|
-| `send_chat_message` | UI → Rust | `SendChatPayload` | `chat-token` (`StreamEvent`) |
+| `send_chat_message` | UI → Rust | `SendChatPayload` (incluye `provider_id`, `model`) | `chat-token` (`StreamEvent`) |
 | `edit:apply` | UI → Rust | `{ action_id: string }` | `edit:success` |
 | `terminal:execute` | UI → Rust | `{ command: string, sandbox_mode: string }` | `terminal:stdout`, `terminal:stderr`, `terminal:exit` |
 | `crypto:unlock` | UI → Rust | `{ passphrase: string }` | `crypto:ready` |
 | `hardware:detect` | UI → Rust | N/A | `hardware:info` |
+| `providers_list` | UI → Rust | N/A | — (retorna `Vec<ProviderConfig>`, presets si no hay fichero) |
+| `providers_seed_presets` | UI → Rust | N/A | — (recrea los presets) |
+| `providers_save` | UI → Rust | `ProviderSavePayload` | — |
+| `providers_delete` | UI → Rust | `{ id: string }` | — |
+| `providers_detect_models` | UI → Rust | `{ provider_id: string }` | — (retorna `Vec<LocalModelInfo>` con tamaño en GB) |
+| `providers_install_model` | UI → Rust | `{ model_name: string }` | — (`ollama pull`, retorna stdout/err) |
 
 ---
 
@@ -112,7 +124,7 @@ Permite conectar alternativamente a OpenAI, Anthropic, Google Gemini y modelos l
 
 ### 2. Módulos bajo Pruebas
 - `src-tauri/src/providers/*`: Pruebas de deserialización de JSON, emisión de eventos `StreamEvent` y manejo de errores HTTP.
-- `src-tauri/src/storage/*`: Pruebas de derivación Argon2id y cifrado/descifrado AES-256-GCM.
+- `src-tauri/src/storage/*`: Pruebas de derivación Argon2id y cifrado/descifrado AES-256-GCM. `providers_store`: roundtrip save/load, upsert/delete, cifrado de API keys.
 - `src-tauri/src/sandbox/*`: Pruebas de invocación de subprocesos aislados y captura de timeouts.
 - Frontend: Build tests estáticos sin errores (`bun run build`).
 

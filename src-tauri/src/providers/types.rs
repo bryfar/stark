@@ -30,6 +30,44 @@ pub struct SendChatPayload {
     pub api_key: Option<String>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ProviderConfig {
+    pub id: String,
+    pub name: String,
+    pub kind: ProviderKind,
+    pub base_url: Option<String>,
+    pub models: Vec<String>,
+    pub needs_api_key: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum ProviderKind {
+    #[default]
+    #[serde(rename = "openai_compatible")]
+    OpenAICompatible,
+    Anthropic,
+    Gemini,
+    Ollama,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct LocalModelInfo {
+    pub name: String,
+    pub size: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ProviderSavePayload {
+    pub id: String,
+    pub name: String,
+    pub kind: String,
+    pub base_url: Option<String>,
+    pub models: Vec<String>,
+    pub needs_api_key: bool,
+    pub api_key: Option<String>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -75,5 +113,20 @@ mod tests {
         assert_eq!(payload.model, "qwen2.5:1.5b");
         assert!(payload.reasoning);
         assert_eq!(payload.messages.len(), 1);
+    }
+    #[test]
+    fn test_provider_config_serialization() {
+        let config = ProviderConfig {
+            id: "openrouter".to_string(),
+            name: "OpenRouter".to_string(),
+            kind: ProviderKind::OpenAICompatible,
+            base_url: Some("https://openrouter.ai/api/v1".to_string()),
+            models: vec!["gpt-4o".to_string()],
+            needs_api_key: true,
+        };
+        let json = serde_json::to_string(&config).unwrap();
+        let deserialized: ProviderConfig = serde_json::from_str(&json).unwrap();
+        assert_eq!(config, deserialized);
+        assert!(json.contains("openai_compatible"));
     }
 }

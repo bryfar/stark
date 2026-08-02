@@ -20,6 +20,7 @@ Este documento transforma la **Forma A (Tauri 2 + Core Rust + Svelte 5)** de Cra
 | **P3** | Terminal Command Modal | Frontend Svelte 5 | Modal de confirmación de ejecución de comandos shell en sandbox. | **Bloqueante** (Requiere decisión explícita del usuario) |
 | **P4** | Security Passphrase Unlock Modal | Frontend Svelte 5 | Modal inicial de desbloqueo cuando no hay Keyring del sistema. | **Bloqueante** (Impide el arranque de la app sin desencriptar) |
 | **P5** | Backend Engine | Core Rust (Tauri 2) | Proceso nativo Rust (adaptadores LLM, indexador, crypto, sandbox). | N/A (Proceso de fondo) |
+| **P6** | Provider Manager Modal | Frontend Svelte 5 | Modal de gestión de proveedores LLM: form, presets, modelos locales. | No bloqueante (se abre sobre P1) |
 
 ---
 
@@ -47,6 +48,10 @@ Este documento transforma la **Forma A (Tauri 2 + Core Rust + Svelte 5)** de Cra
 | **U18** | P3 | TerminalModal / Actions | Botón "Cancelar Comando" | click | → P1 | — |
 | **U19** | P4 | UnlockModal / Form | Campo de Entrada de Passphrase | type | — | — |
 | **U20** | P4 | UnlockModal / Form | Botón "Desbloquear" | click | → N10 | — |
+| **U21** | P1 | ChatPanel / ProviderBar | Botón Engranaje (Settings2) — abre gestión de proveedores | click | → P6 | — |
+| **U22** | P6 | ProviderManagerModal / LocalModels | Lista de Modelos Locales con Detectar/Instalar (`ollama pull`) | click | → N14, → N15 | — |
+| **U23** | P6 | ProviderManagerModal / Form | Form de Proveedor (nombre, tipo, base_url, modelos, API key) | type/click | → N13 | — |
+| **U24** | P6 | ProviderManagerModal / Actions | Botón Guardar / Eliminar Proveedor | click | → N13 | → P1 |
 
 ---
 
@@ -66,6 +71,9 @@ Este documento transforma la **Forma A (Tauri 2 + Core Rust + Svelte 5)** de Cra
 | **N10** | P5 | `commands::crypto` | `crypto:unlock(passphrase)` | call | → S6, → N11 | → P1 |
 | **N11** | P5 | `storage::encrypted` | `save_state(state, master_key)` (AES-256-GCM) | call | — | — |
 | **N12** | P5 | `commands::hardware` | `hardware:detect()` (`sysinfo` RAM/VRAM) | call | — | → U11 |
+| **N13** | P5 | `storage::providers_store` | `providers_save/delete/list` (persistencia cifrada + presets) | call | → S7 | → U24 |
+| **N14** | P5 | `commands::providers` | `providers_detect_models(provider_id)` (GET `/api/tags`) | call | — | → U22 |
+| **N15** | P5 | `commands::providers` | `providers_install_model(model)` (`ollama pull` vía tokio) | call | — | → U22 |
 
 ---
 
@@ -79,6 +87,7 @@ Este documento transforma la **Forma A (Tauri 2 + Core Rust + Svelte 5)** de Cra
 | **S4** | P5 | `pendingActionState` | Propuesta de edición de código pendiente de aprobación | N6 | U12, N7 |
 | **S5** | P5 | `pendingCommandState` | Comando shell pendiente de ejecución en sandbox | N8 | U15, N9 |
 | **S6** | P5 | `masterKey` | Clave AES-256-GCM en memoria derivada de passphrase/Keyring | N10 | N11 |
+| **S7** | P5 | `providersConfig` | Lista de providers configurados (nombre, tipo, base_url, modelos) | N13 | U1, U2 |
 
 ---
 
@@ -117,6 +126,13 @@ flowchart TB
         U14["U14: Botón Rechazar Edición"]
     end
 
+    subgraph P6["P6: Provider Manager Modal"]
+        U21["U21: Engranaje abrir gestión"]
+        U22["U22: Modelos locales Detectar/Instalar"]
+        U23["U23: Form de Proveedor"]
+        U24["U24: Guardar/Eliminar"]
+    end
+
     subgraph P3["P3: Terminal Command Modal (Bloqueante)"]
         U15["U15: Command Info & Sandbox Mode"]
         U16["U16: Live Console Output"]
@@ -137,6 +153,9 @@ flowchart TB
         N10["N10: crypto:unlock()"]
         N11["N11: storage::save_state()"]
         N12["N12: hardware:detect()"]
+        N13["N13: providers_save/list/delete"]
+        N14["N14: providers_detect_models()"]
+        N15["N15: providers_install_model()"]
 
         S1[("S1: configStore")]
         S2[("S2: conversationStore")]
@@ -144,6 +163,7 @@ flowchart TB
         S4[("S4: pendingActionState")]
         S5[("S5: pendingCommandState")]
         S6[("S6: masterKey")]
+        S7[("S7: providersConfig")]
     end
 
     %% Wiring connections
@@ -170,6 +190,13 @@ flowchart TB
     N6 -->|Terminal needed| N8 --> S5 --> P3
     U17 -->|click| N9 --> U16
     U18 -->|click| P1
+
+    U21 -->|click| P6
+    U23 & U24 --> N13 --> S7
+    N13 --> S7
+    S7 -->|lectura| U1 & U2
+    U22 --> N14
+    U22 -->|Instalar| N15
 
     N2 -.->|Stream tokens| U5
     N2 -.->|Usage| U9
