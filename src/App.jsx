@@ -1,5 +1,5 @@
 import { h } from 'preact';
-import { useState } from 'preact/hooks';
+import { useState, useEffect } from 'preact/hooks';
 import { Sidebar } from './components/Sidebar';
 import { HeaderBar } from './components/HeaderBar';
 import { ChatView } from './components/ChatView';
@@ -18,6 +18,16 @@ export function App() {
   const [proposedEdit, setProposedEdit] = useState(null);
   const [proposedCommand, setProposedCommand] = useState(null);
   const [isLocked, setIsLocked] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => {
+      const scale = Math.max(0.7, Math.min(1.0, window.innerWidth / 1315));
+      document.documentElement.style.setProperty('--ui-scale', scale.toFixed(3));
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const handleApproveEdit = async (edit) => {
     try {
