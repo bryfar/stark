@@ -1,192 +1,214 @@
 import { h } from 'preact';
-import { useState } from 'preact/hooks';
-import { Home, Layers, Puzzle, Link as LinkIcon, Stethoscope, Activity, PanelLeftClose, MessageSquareCode, Plus, FileCode } from 'lucide-react';
-import { Logo } from './Logo';
+import { useState, useRef, useEffect } from 'preact/hooks';
+import { 
+  Home, SwatchBook, Plug, FolderOpen, Puzzle, 
+  MessageSquare, Code, Palette, Plus, PanelLeft, X, Pin, PinOff, Clock
+} from 'lucide-react';
 
-export function Sidebar({
-  isSidebarOpen,
-  onToggleSidebar,
-  currentMode,
-  onOpenDoctor,
-  conversations,
-  activeChatId,
-  onSelectChat,
-  onNewChat,
-  activeFile,
-  setActiveFile,
-  activePage,
-  setActivePage,
-  fileTree = [],
-  isMaximized
-}) {
-  const pages = [
-    { id: 'home',         icon: Home,     label: 'Home',          title: 'Home — Nuevo Chat General' },
-    { id: 'ds',           icon: Layers,   label: 'Design System', title: 'Design System' },
-    { id: 'plugin',       icon: Puzzle,   label: 'Plugin Hub',    title: 'Plugin Hub' },
-    { id: 'integrations', icon: LinkIcon, label: 'Integrations',  title: 'Integrations' }
+export function Sidebar({ currentMode, setMode, isMaximized, setIsMaximized, activePage, setActivePage }) {
+  const [isOverlayOpen, setIsOverlayOpen] = useState(false);
+  const [isPinned, setIsPinned] = useState(false);
+  const overlayRef = useRef(null);
+
+  const modes = [
+    { id: 'chat', label: 'Chat General', icon: <MessageSquare size={16} strokeWidth={1.75} />, badge: 'Fast' },
+    { id: 'code', label: 'Modo Code', icon: <Code size={16} strokeWidth={1.75} />, badge: 'Workspace' },
+    { id: 'design', label: 'Modo Design', icon: <Palette size={16} strokeWidth={1.75} />, badge: 'Live Canvas' }
   ];
 
-  return (
-    <aside className={`app-sidebar ${!isSidebarOpen ? 'collapsed' : ''}`}>
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+  const pages = [
+    { id: 'home', icon: <Home size={18} strokeWidth={1.75} />, label: 'Home' },
+    { id: 'design-system', icon: <SwatchBook size={18} strokeWidth={1.75} />, label: 'Design System' },
+    { id: 'plugin-hub', icon: <Plug size={18} strokeWidth={1.75} />, label: 'Plugin Hub' },
+    { id: 'projects', icon: <FolderOpen size={18} strokeWidth={1.75} />, label: 'Projects' },
+    { id: 'integrations', icon: <Puzzle size={18} strokeWidth={1.75} />, label: 'Integrations' }
+  ];
 
-        {/* Level 1: Brand Header */}
-        <div className="brand-header" style={{ flexShrink: 0, justifyContent: 'space-between', width: '100%' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <Logo size={36} />
-            <div>
-              <h1 className="brand-title">Stark</h1>
-              <span style={{ fontSize: '10px', color: 'var(--colors-muted)', fontFamily: 'var(--font-mono)' }}>
-                Desktop for Linux
-              </span>
-            </div>
-          </div>
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (!isPinned && isOverlayOpen && overlayRef.current && !overlayRef.current.contains(e.target)) {
+        setIsOverlayOpen(false);
+      }
+    }
+    function handleEsc(e) {
+      if (e.key === 'Escape' && isOverlayOpen && !isPinned) {
+        setIsOverlayOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEsc);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEsc);
+    };
+  }, [isOverlayOpen, isPinned]);
 
-          <button
-            onClick={onToggleSidebar}
-            title="Ocultar Sidebar"
-            style={{ background: 'transparent', border: 'none', color: 'var(--colors-muted)', cursor: 'pointer', padding: '4px 6px', borderRadius: '4px' }}
-          >
-            <PanelLeftClose size={14} strokeWidth={1.75} />
-          </button>
-        </div>
+  const handleRailHover = () => {
+    if (!isMaximized && !isPinned) setIsOverlayOpen(true);
+  };
+  
+  const handleRailClick = () => {
+    if (!isMaximized) {
+      setIsPinned(!isPinned);
+      setIsOverlayOpen(true);
+    }
+  };
 
-        {/* Level 2: Global Pages — Icon + Label rows (always visible) */}
-        <div style={{ flexShrink: 0, marginBottom: '4px', paddingBottom: '8px', borderBottom: '1px solid var(--colors-hairline)' }}>
-          <div style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--colors-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', padding: '0 10px', marginBottom: '4px' }}>
-            Pages
-          </div>
-          {pages.map((p) => {
-            const IconComp = p.icon;
-            const isActive = activePage === p.id;
-            return (
-              <button
-                key={p.id}
-                onClick={() => {
-                  setActivePage && setActivePage(p.id);
-                  if (p.id === 'home') onNewChat && onNewChat();
-                }}
-                style={{
-                  width: '100%',
-                  padding: '6px 10px',
-                  marginBottom: '1px',
-                  borderRadius: '5px',
-                  border: 'none',
-                  background: isActive ? 'var(--colors-surface-card)' : 'transparent',
-                  color: isActive ? 'var(--colors-ink-deep)' : 'var(--colors-body)',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '9px',
-                  fontSize: '13px',
-                  fontFamily: 'var(--font-sans)',
-                  fontWeight: isActive ? '500' : '400',
-                  textAlign: 'left',
-                  transition: 'background 120ms ease, color 120ms ease',
-                  position: 'relative'
-                }}
-              >
-                {isActive && (
-                  <span style={{
-                    position: 'absolute',
-                    left: 0,
-                    top: '4px',
-                    bottom: '4px',
-                    width: '2px',
-                    borderRadius: '0 2px 2px 0',
-                    background: 'var(--colors-ink)'
-                  }} />
-                )}
-                <IconComp size={14} strokeWidth={1.75} style={{ flexShrink: 0 }} />
-                <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.label}</span>
-              </button>
-            );
-          })}
-        </div>
+  const handleToggleMaximize = () => {
+    setIsMaximized(!isMaximized);
+  };
 
-        {/* Level 3: Dynamic Lower Container */}
-        {currentMode === 'chat' && (
-          <div style={{ flex: 1, overflowY: 'auto' }}>
-            <button className="new-chat-btn" onClick={onNewChat}>
-              <Plus size={15} strokeWidth={1.75} />
-              <span>Nuevo Chat</span>
-            </button>
-            <div className="history-section">
-              <div className="history-title">Historial</div>
-              {conversations && conversations.map((c) => (
-                <div
-                  key={c.id}
-                  className={`history-item ${activeChatId === c.id ? 'active' : ''}`}
-                  onClick={() => onSelectChat(c.id)}
-                >
-                  <MessageSquareCode size={13} strokeWidth={1.75} style={{ color: 'var(--colors-muted)' }} />
-                  <span>{c.title}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {currentMode === 'code' && (
-          <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '8px', borderBottom: '1px solid var(--colors-hairline)' }}>
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: '700', color: 'var(--colors-ink)' }}>Files</span>
-              <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--colors-muted)' }}>{fileTree.length}</span>
-            </div>
-            {fileTree.length === 0 && (
-              <div style={{ fontSize: '12px', fontFamily: 'var(--font-mono)', color: 'var(--colors-muted)', textAlign: 'center', padding: '24px 12px', lineHeight: '1.6' }}>
-                Sin archivos indexados.<br />Abre un workspace para listarlos.
+  if (isMaximized) {
+    return (
+      <aside className="app-sidebar">
+        <div>
+          <div className="brand-header" style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+              <div className="brand-icon">C</div>
+              <div>
+                <h1 className="brand-title">Crafter</h1>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Linux Lightweight Desktop</span>
               </div>
-            )}
-            {fileTree.map((f) => {
-              const isActive = activeFile === f.name;
-              return (
-                <div
-                  key={f.name}
-                  onClick={() => setActiveFile && setActiveFile(f.name)}
-                  style={{
-                    padding: '7px 10px', borderRadius: '4px', fontFamily: 'var(--font-mono)', fontSize: '12.5px',
-                    color: isActive ? 'var(--colors-ink-deep)' : 'var(--colors-body)',
-                    background: isActive ? 'var(--colors-surface-card)' : 'transparent',
-                    border: isActive ? '1px solid var(--colors-hairline)' : '1px solid transparent',
-                    cursor: 'pointer', display: 'flex', alignItems: 'center',
-                    transition: 'all var(--transition-fast)'
-                  }}
+            </div>
+            <button onClick={handleToggleMaximize} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
+              <PanelLeft size={18} strokeWidth={1.75} />
+            </button>
+          </div>
+
+          <nav className="mode-selector">
+            {modes.map((m) => (
+              <button
+                key={m.id}
+                className={`mode-btn ${currentMode === m.id ? 'active' : ''}`}
+                onClick={() => setMode(m.id)}
+              >
+                <span style={{display:'flex'}}>{m.icon}</span>
+                <span>{m.label}</span>
+                <span className="mode-badge">{m.badge}</span>
+              </button>
+            ))}
+          </nav>
+          
+          <div style={{ marginTop: '24px' }}>
+            <div style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '8px', letterSpacing: '0.5px', fontWeight: 600 }}>Pages</div>
+            <nav style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              {pages.map((p) => (
+                <button
+                  key={p.id}
+                  className={`mode-btn ${activePage === p.id ? 'active' : ''}`}
+                  onClick={() => setActivePage(p.id)}
+                  style={{ padding: '8px 12px' }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
-                    <FileCode size={13} strokeWidth={1.75} style={{ color: isActive ? 'var(--colors-ink-deep)' : 'var(--colors-muted)', flexShrink: 0 }} />
-                    <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{f.name}</span>
-                  </div>
-                </div>
-              );
-            })}
+                  <span style={{display:'flex', opacity: 0.7}}>{p.icon}</span>
+                  <span>{p.label}</span>
+                </button>
+              ))}
+            </nav>
           </div>
-        )}
-
-        {/* In Design mode, sidebar lower is empty — chat lives in the side panel next to canvas */}
-        {currentMode === 'design' && (
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--colors-muted)', textAlign: 'center', lineHeight: '1.5' }}>
-              Panel de diseño<br />activo al costado
-            </span>
-          </div>
-        )}
-      </div>
-
-      {/* Persistent Footer */}
-      <div className="sidebar-footer" style={{ flexShrink: 0, marginTop: 'auto' }}>
-        <button className="doctor-btn-sidebar" onClick={onOpenDoctor}>
-          <Stethoscope size={14} strokeWidth={1.75} />
-          <span>Stark Doctor</span>
-        </button>
-        <div className="system-status">
-          <div className="status-indicator">
-            <Activity size={12} strokeWidth={1.75} style={{ color: 'var(--colors-body-strong)' }} />
-            <span>Ollama / Local LLM</span>
-          </div>
-          <span>RAM &lt; 300MB</span>
         </div>
-      </div>
-    </aside>
+
+        <div className="sidebar-footer">
+          <div className="system-status">
+            <div className="status-indicator">
+              <span className="dot"></span>
+              <span>Ollama / Hybrid LLM</span>
+            </div>
+            <span>RAM &lt; 300MB</span>
+          </div>
+        </div>
+      </aside>
+    );
+  }
+
+  return (
+    <>
+      <aside 
+        className="app-sidebar-compact" 
+        onMouseEnter={handleRailHover}
+        onClick={handleRailClick}
+      >
+        <button className="compact-rail-btn" onClick={(e) => { e.stopPropagation(); handleToggleMaximize(); }} title="Expand Sidebar">
+          <PanelLeft size={20} strokeWidth={1.75} />
+        </button>
+        <div className="compact-rail-icons">
+          {pages.map(p => (
+            <button 
+              key={p.id} 
+              className={`compact-icon-btn ${activePage === p.id ? 'active' : ''}`}
+              title={p.label}
+              onClick={(e) => { e.stopPropagation(); setActivePage(p.id); }}
+            >
+              {p.icon}
+            </button>
+          ))}
+        </div>
+      </aside>
+
+      {(isOverlayOpen || isPinned) && (
+        <div className="sidebar-overlay-panel" ref={overlayRef}>
+          <div className="overlay-header">
+            <div className="brand-icon" style={{ width: 24, height: 24, fontSize: 12 }}>C</div>
+            <span style={{ fontWeight: 600, fontSize: 14 }}>Crafter</span>
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: '4px' }}>
+              <button className="overlay-icon-btn" onClick={() => setIsPinned(!isPinned)} title={isPinned ? "Unpin" : "Pin"}>
+                {isPinned ? <PinOff size={16} strokeWidth={1.75} /> : <Pin size={16} strokeWidth={1.75} />}
+              </button>
+              <button className="overlay-icon-btn" onClick={() => { setIsOverlayOpen(false); setIsPinned(false); }} title="Close">
+                <X size={16} strokeWidth={1.75} />
+              </button>
+            </div>
+          </div>
+
+          <div className="overlay-modes">
+            {modes.map((m) => (
+              <button
+                key={m.id}
+                className={`mode-btn ${currentMode === m.id ? 'active' : ''}`}
+                onClick={() => setMode(m.id)}
+                style={{ padding: '8px 10px' }}
+              >
+                <span style={{display:'flex'}}>{m.icon}</span>
+                <span>{m.label}</span>
+              </button>
+            ))}
+          </div>
+
+          <button className="new-chat-btn">
+            <Plus size={16} strokeWidth={1.75} />
+            <span>New Chat</span>
+          </button>
+
+          <div className="overlay-section">
+            <div className="section-title">Pages</div>
+            {pages.map(p => (
+              <button 
+                key={p.id}
+                className={`page-btn ${activePage === p.id ? 'active' : ''}`}
+                onClick={() => setActivePage(p.id)}
+              >
+                <span style={{display:'flex', opacity: 0.7}}>{p.icon}</span>
+                <span>{p.label}</span>
+              </button>
+            ))}
+          </div>
+
+          <div className="overlay-section" style={{ flex: 1, overflowY: 'auto' }}>
+            <div className="section-title">History</div>
+            <div className="history-item">
+              <MessageSquare size={14} strokeWidth={1.75} />
+              <span>Update layout components</span>
+            </div>
+            <div className="history-item">
+              <MessageSquare size={14} strokeWidth={1.75} />
+              <span>Fix navigation bug</span>
+            </div>
+            <div className="history-item">
+              <Clock size={14} strokeWidth={1.75} />
+              <span>Older chats...</span>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
