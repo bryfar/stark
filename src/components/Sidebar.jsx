@@ -1,25 +1,29 @@
 import { h } from 'preact';
 import { useState, useRef, useEffect } from 'preact/hooks';
+import { Logo } from './Logo';
 import { 
   Home, SwatchBook, Plug, FolderOpen, Puzzle, 
-  MessageSquare, Code, Palette, Plus, PanelLeft, X, Pin, PinOff, Clock
+  MessageSquare, Code, Palette, Plus, PanelLeft, X, Pin, PinOff, Clock, Settings
 } from 'lucide-react';
+import { translations } from '../i18n';
 
-export function Sidebar({ currentMode, setMode, isMaximized, setIsMaximized, activePage, setActivePage }) {
+export function Sidebar({ currentMode, setMode, isMaximized, setIsMaximized, activePage, setActivePage, onOpenSettings, lang = 'es' }) {
   const [isOverlayOpen, setIsOverlayOpen] = useState(false);
   const [isPinned, setIsPinned] = useState(false);
   const overlayRef = useRef(null);
 
+  const t = translations[lang] ? translations[lang].sidebar : translations.es.sidebar;
+
   const modes = [
-    { id: 'chat', label: 'Chat General', icon: <MessageSquare size={16} strokeWidth={1.75} />, badge: 'Fast' },
-    { id: 'code', label: 'Modo Code', icon: <Code size={16} strokeWidth={1.75} />, badge: 'Workspace' },
-    { id: 'design', label: 'Modo Design', icon: <Palette size={16} strokeWidth={1.75} />, badge: 'Live Canvas' }
+    { id: 'chat', label: t.chat, icon: <MessageSquare size={16} strokeWidth={1.75} />, badge: 'Fast' },
+    { id: 'code', label: t.code, icon: <Code size={16} strokeWidth={1.75} />, badge: 'Workspace' },
+    { id: 'design', label: t.design, icon: <Palette size={16} strokeWidth={1.75} />, badge: 'Live Canvas' }
   ];
 
   const pages = [
     { id: 'home', icon: <Home size={18} strokeWidth={1.75} />, label: 'Home' },
-    { id: 'design-system', icon: <SwatchBook size={18} strokeWidth={1.75} />, label: 'Design System' },
-    { id: 'plugin-hub', icon: <Plug size={18} strokeWidth={1.75} />, label: 'Plugin Hub' },
+    { id: 'ds', icon: <SwatchBook size={18} strokeWidth={1.75} />, label: 'Design System' },
+    { id: 'plugin', icon: <Plug size={18} strokeWidth={1.75} />, label: 'Plugin Hub' },
     { id: 'projects', icon: <FolderOpen size={18} strokeWidth={1.75} />, label: 'Projects' },
     { id: 'integrations', icon: <Puzzle size={18} strokeWidth={1.75} />, label: 'Integrations' }
   ];
@@ -55,73 +59,16 @@ export function Sidebar({ currentMode, setMode, isMaximized, setIsMaximized, act
   };
 
   const handleToggleMaximize = () => {
-    setIsMaximized(!isMaximized);
+    if (setIsMaximized) {
+      setIsMaximized(!isMaximized);
+    }
   };
 
-  if (isMaximized) {
-    return (
-      <aside className="app-sidebar">
-        <div>
-          <div className="brand-header" style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-              <div className="brand-icon">C</div>
-              <div>
-                <h1 className="brand-title">Crafter</h1>
-                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Linux Lightweight Desktop</span>
-              </div>
-            </div>
-            <button onClick={handleToggleMaximize} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
-              <PanelLeft size={18} strokeWidth={1.75} />
-            </button>
-          </div>
-
-          <nav className="mode-selector">
-            {modes.map((m) => (
-              <button
-                key={m.id}
-                className={`mode-btn ${currentMode === m.id ? 'active' : ''}`}
-                onClick={() => setMode(m.id)}
-              >
-                <span style={{display:'flex'}}>{m.icon}</span>
-                <span>{m.label}</span>
-                <span className="mode-badge">{m.badge}</span>
-              </button>
-            ))}
-          </nav>
-          
-          <div style={{ marginTop: '24px' }}>
-            <div style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '8px', letterSpacing: '0.5px', fontWeight: 600 }}>Pages</div>
-            <nav style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              {pages.map((p) => (
-                <button
-                  key={p.id}
-                  className={`mode-btn ${activePage === p.id ? 'active' : ''}`}
-                  onClick={() => setActivePage(p.id)}
-                  style={{ padding: '8px 12px' }}
-                >
-                  <span style={{display:'flex', opacity: 0.7}}>{p.icon}</span>
-                  <span>{p.label}</span>
-                </button>
-              ))}
-            </nav>
-          </div>
-        </div>
-
-        <div className="sidebar-footer">
-          <div className="system-status">
-            <div className="status-indicator">
-              <span className="dot"></span>
-              <span>Ollama / Hybrid LLM</span>
-            </div>
-            <span>RAM &lt; 300MB</span>
-          </div>
-        </div>
-      </aside>
-    );
-  }
-
   return (
-    <>
+    <div 
+      style={{ display: 'contents' }} 
+      onMouseLeave={() => { if (!isPinned) setIsOverlayOpen(false); }}
+    >
       <aside 
         className="app-sidebar-compact" 
         onMouseEnter={handleRailHover}
@@ -130,7 +77,7 @@ export function Sidebar({ currentMode, setMode, isMaximized, setIsMaximized, act
         <button className="compact-rail-btn" onClick={(e) => { e.stopPropagation(); handleToggleMaximize(); }} title="Expand Sidebar">
           <PanelLeft size={20} strokeWidth={1.75} />
         </button>
-        <div className="compact-rail-icons">
+        <div className="compact-rail-icons" style={{ flex: 1 }}>
           {pages.map(p => (
             <button 
               key={p.id} 
@@ -142,18 +89,27 @@ export function Sidebar({ currentMode, setMode, isMaximized, setIsMaximized, act
             </button>
           ))}
         </div>
+        
+        <button 
+          className="compact-icon-btn" 
+          title="Configuración"
+          onClick={(e) => { e.stopPropagation(); onOpenSettings && onOpenSettings(); }}
+          style={{ marginTop: 'auto' }}
+        >
+          <Settings size={18} strokeWidth={1.75} />
+        </button>
       </aside>
 
-      {(isOverlayOpen || isPinned) && (
+      {(isOverlayOpen || isPinned || isMaximized) && (
         <div className="sidebar-overlay-panel" ref={overlayRef}>
           <div className="overlay-header">
-            <div className="brand-icon" style={{ width: 24, height: 24, fontSize: 12 }}>C</div>
-            <span style={{ fontWeight: 600, fontSize: 14 }}>Crafter</span>
+            <Logo size={24} />
+            <span style={{ fontWeight: 700, fontSize: 15, fontFamily: 'var(--font-mono)' }}>Stark</span>
             <div style={{ marginLeft: 'auto', display: 'flex', gap: '4px' }}>
               <button className="overlay-icon-btn" onClick={() => setIsPinned(!isPinned)} title={isPinned ? "Unpin" : "Pin"}>
                 {isPinned ? <PinOff size={16} strokeWidth={1.75} /> : <Pin size={16} strokeWidth={1.75} />}
               </button>
-              <button className="overlay-icon-btn" onClick={() => { setIsOverlayOpen(false); setIsPinned(false); }} title="Close">
+              <button className="overlay-icon-btn" onClick={() => { setIsOverlayOpen(false); setIsPinned(false); if (setIsMaximized) setIsMaximized(false); }} title="Close">
                 <X size={16} strokeWidth={1.75} />
               </button>
             </div>
@@ -163,9 +119,8 @@ export function Sidebar({ currentMode, setMode, isMaximized, setIsMaximized, act
             {modes.map((m) => (
               <button
                 key={m.id}
-                className={`mode-btn ${currentMode === m.id ? 'active' : ''}`}
-                onClick={() => setMode(m.id)}
-                style={{ padding: '8px 10px' }}
+                className={`sidebar-mode-btn ${currentMode === m.id ? 'active' : ''}`}
+                onClick={() => setMode && setMode(m.id)}
               >
                 <span style={{display:'flex'}}>{m.icon}</span>
                 <span>{m.label}</span>
@@ -175,25 +130,25 @@ export function Sidebar({ currentMode, setMode, isMaximized, setIsMaximized, act
 
           <button className="new-chat-btn">
             <Plus size={16} strokeWidth={1.75} />
-            <span>New Chat</span>
+            <span>{t.newChat}</span>
           </button>
 
           <div className="overlay-section">
-            <div className="section-title">Pages</div>
+            <div className="section-title">{t.pages}</div>
             {pages.map(p => (
               <button 
                 key={p.id}
-                className={`page-btn ${activePage === p.id ? 'active' : ''}`}
+                className={`sidebar-option-btn ${activePage === p.id ? 'active' : ''}`}
                 onClick={() => setActivePage(p.id)}
               >
-                <span style={{display:'flex', opacity: 0.7}}>{p.icon}</span>
+                <span style={{display:'flex', opacity: activePage === p.id ? 1 : 0.7}}>{p.icon}</span>
                 <span>{p.label}</span>
               </button>
             ))}
           </div>
 
           <div className="overlay-section" style={{ flex: 1, overflowY: 'auto' }}>
-            <div className="section-title">History</div>
+            <div className="section-title">{t.history}</div>
             <div className="history-item">
               <MessageSquare size={14} strokeWidth={1.75} />
               <span>Update layout components</span>
@@ -204,11 +159,22 @@ export function Sidebar({ currentMode, setMode, isMaximized, setIsMaximized, act
             </div>
             <div className="history-item">
               <Clock size={14} strokeWidth={1.75} />
-              <span>Older chats...</span>
+              <span>{t.olderChats}</span>
             </div>
+          </div>
+
+          <div className="sidebar-footer" style={{ marginTop: 'auto', paddingTop: '12px', borderTop: '1px solid var(--colors-hairline)' }}>
+            <button 
+              className="sidebar-option-btn" 
+              onClick={() => onOpenSettings && onOpenSettings()}
+              style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+            >
+              <Settings size={16} strokeWidth={1.75} />
+              <span>{t.settings}</span>
+            </button>
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 }

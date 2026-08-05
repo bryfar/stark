@@ -120,7 +120,7 @@ bun run tauri dev        # Runs both frontend + backend
 - **Styling:** Tailwind CSS 4 (CSS-first config), design tokens from `DESIGN.md`
 - **Icons:** **Lucide Icons only** (`lucide-svelte`), `strokeWidth={1.75}`
 - **Typography:** **100% monospace** — Berkeley Mono / IBM Plex Mono / JetBrains Mono
-- **Colors:** Strict monochrome neutral + warm earth primary (`#8c6253`) — **no blue/cyan accents**
+- **Colors:** Strict monochrome neutral scale of grays, blacks, and whites — **no blue/cyan accents**
 - **Dropdowns:** **Dropup only** — `bottom: calc(100% + 6px)` (never downward)
 - **No emojis, no text brackets** on any UI label/button (per DESIGN.md guardrails)
 - **State:** Split `configStore` (provider, model, mode, reasoning) + `conversationStore` (messages, tokens, streaming buffer)

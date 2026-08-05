@@ -252,6 +252,93 @@ async fn providers_install_model(model_name: String) -> Result<String, String> {
     }
 }
 
+#[tauri::command]
+async fn voice_transcribe(audio_base64: String) -> Result<String, String> {
+    use base64::{Engine as _, engine::general_purpose};
+    let decoded = general_purpose::STANDARD
+        .decode(&audio_base64)
+        .map_err(|e| format!("Error decodificando audio base64: {}", e))?;
+    
+    let temp_dir = std::env::temp_dir();
+    let temp_file = temp_dir.join("crafter_voice.wav");
+    std::fs::write(&temp_file, &decoded)
+        .map_err(|e| format!("Error guardando archivo de audio temporal: {}", e))?;
+
+    let output = tokio::process::Command::new("whisper")
+        .arg(&temp_file)
+        .arg("--output_format")
+        .arg("txt")
+        .output()
+        .await;
+
+    match output {
+        Ok(out) if out.status.success() => {
+            let txt_file = temp_file.with_extension("txt");
+            if txt_file.exists() {
+                let text = std::fs::read_to_string(&txt_file)
+                    .map_err(|e| format!("Error leyendo transcripción: {}", e))?;
+                let _ = std::fs::remove_file(txt_file);
+                let _ = std::fs::remove_file(temp_file);
+                Ok(text.trim().to_string())
+            } else {
+                let stdout = String::from_utf8_lossy(&out.stdout).to_string();
+                let _ = std::fs::remove_file(temp_file);
+                Ok(stdout.trim().to_string())
+            }
+        }
+        _ => {
+            let _ = std::fs::remove_file(temp_file);
+            Err("Whisper no disponible en el sistema. Instala whisper para dictado.".to_string())
+        }
+    }
+}
+
+#[tauri::command]
+async fn terminal_execute_ssh(
+    cmd_str: String,
+    host: String,
+    timeout_secs: u64,
+) -> Result<ExecutionResult, String> {
+    let output_future = tokio::process::Command::new("ssh")
+        .arg("-o")
+        .arg("StrictHostKeyChecking=no")
+        .arg(&host)
+        .arg(&cmd_str)
+        .output();
+
+    match tokio::time::timeout(tokio::time::Duration::from_secs(timeout_secs), output_future).await {
+        Ok(Ok(output)) => {
+            let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+            let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+            Ok(ExecutionResult {
+                exit_code: output.status.code().unwrap_or(-1),
+                stdout,
+                stderr,
+            })
+        }
+        Ok(Err(e)) => Err(format!("Error ejecutando comando SSH: {}", e)),
+        Err(_) => Err(format!("El comando SSH excedió el tiempo límite de {} segundos", timeout_secs)),
+    }
+}
+
+#[tauri::command]
+fn workspace_multi_root_save(folders: Vec<String>) -> Result<(), String> {
+    let folders_str = serde_json::to_string(&folders).map_err(|e| e.to_string())?;
+    save_encrypted_value("workspace_multi_root", &folders_str)?;
+    Ok(())
+}
+
+#[tauri::command]
+fn workspace_multi_root_load() -> Result<Vec<String>, String> {
+    match load_encrypted_value("workspace_multi_root") {
+        Ok(val) => {
+            let folders: Vec<String> = serde_json::from_str(&val).map_err(|e| e.to_string())?;
+            Ok(folders)
+        }
+        Err(_) => Ok(Vec::new()),
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -275,7 +362,11 @@ pub fn run() {
             providers_save,
             providers_delete,
             providers_detect_models,
-            providers_install_model
+            providers_install_model,
+            voice_transcribe,
+            terminal_execute_ssh,
+            workspace_multi_root_save,
+            workspace_multi_root_load
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -97,12 +97,12 @@ export function ModelSelectorModal({
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 padding: '8px 12px', background: 'var(--colors-surface-card)',
-                border: selectedProvider === 'ollama' && selectedModel === model ? '1px solid #8c6253' : '1px solid var(--colors-hairline)',
+                border: selectedProvider === 'ollama' && selectedModel === model ? '1px solid var(--colors-primary)' : '1px solid var(--colors-hairline)',
                 borderRadius: '4px', cursor: 'pointer'
               }}
             >
               <span style={{ fontSize: '12px', fontFamily: 'var(--font-mono)', color: 'var(--colors-ink)' }}>{model}</span>
-              {selectedProvider === 'ollama' && selectedModel === model && <Check size={14} strokeWidth={1.75} style={{ color: '#8c6253' }} />}
+              {selectedProvider === 'ollama' && selectedModel === model && <Check size={14} strokeWidth={1.75} style={{ color: 'var(--colors-primary)' }} />}
             </div>
           ))}
 
@@ -140,12 +140,12 @@ export function ModelSelectorModal({
                 style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                   padding: '8px 12px', background: 'var(--colors-surface-card)',
-                  border: selectedProvider === provider.id && selectedModel === model ? '1px solid #8c6253' : '1px solid var(--colors-hairline)',
+                  border: selectedProvider === provider.id && selectedModel === model ? '1px solid var(--colors-primary)' : '1px solid var(--colors-hairline)',
                   borderRadius: '4px', cursor: 'pointer'
                 }}
               >
                 <span style={{ fontSize: '12px', fontFamily: 'var(--font-mono)', color: 'var(--colors-ink)' }}>{model}</span>
-                {selectedProvider === provider.id && selectedModel === model && <Check size={14} strokeWidth={1.75} style={{ color: '#8c6253' }} />}
+                {selectedProvider === provider.id && selectedModel === model && <Check size={14} strokeWidth={1.75} style={{ color: 'var(--colors-primary)' }} />}
               </div>
             ))}
           </div>

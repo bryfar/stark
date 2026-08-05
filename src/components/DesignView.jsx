@@ -16,9 +16,9 @@ export function DesignView({ htmlCode, activePreset, activePage, onSelectPreset,
   const pickerScript = `
     <style>
       .cd-pick-highlight {
-        outline: 2px solid #8c6253 !important;
+        outline: 2px dashed #18181b !important;
         outline-offset: 1px !important;
-        background: rgba(140, 98, 83, 0.08) !important;
+        background: rgba(0, 0, 0, 0.05) !important;
       }
       .cd-pick-active * { cursor: crosshair !important; }
       .cd-pick-active { user-select: none !important; }

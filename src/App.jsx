@@ -12,9 +12,12 @@ import { TerminalModal } from './components/TerminalModal';
 import { DoctorModal } from './components/DoctorModal';
 import { ProviderManagerModal } from './components/ProviderManagerModal';
 import { ModelSelectorModal } from './components/ModelSelectorModal';
+import { SettingsModal } from './components/SettingsModal';
 import { DesignSystemPage } from './components/pages/DesignSystemPage';
 import { PluginHubPage } from './components/pages/PluginHubPage';
 import { IntegrationsPage } from './components/pages/IntegrationsPage';
+import { ProjectsPage } from './components/pages/ProjectsPage';
+import { SessionTabs } from './components/SessionTabs';
 
 export function App() {
   const [currentMode, setMode] = useState('chat');
@@ -30,7 +33,42 @@ export function App() {
   const [isDoctorOpen, setIsDoctorOpen] = useState(false);
   const [isProviderManagerOpen, setIsProviderManagerOpen] = useState(false);
   const [isModelSelectorOpen, setIsModelSelectorOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [lang, setLang] = useState('es');
   const [providersConfig, setProvidersConfig] = useState([]);
+
+  const [codeSessions, setCodeSessions] = useState([{ id: 'code-1', title: 'Sesión 1' }]);
+  const [activeCodeSessionId, setActiveCodeSessionId] = useState('code-1');
+  const [designSessions, setDesignSessions] = useState([]);
+  const [activeDesignSessionId, setActiveDesignSessionId] = useState(null);
+
+  function addCodeSession() {
+    const id = `code-${Date.now()}`;
+    setCodeSessions(prev => [...prev, { id, title: `Sesión ${prev.length + 1}` }]);
+    setActiveCodeSessionId(id);
+  }
+
+  function closeCodeSession(id) {
+    setCodeSessions(prev => {
+      const next = prev.filter(s => s.id !== id);
+      if (activeCodeSessionId === id && next.length > 0) setActiveCodeSessionId(next[next.length - 1].id);
+      return next;
+    });
+  }
+
+  function addDesignSession() {
+    const id = `design-${Date.now()}`;
+    setDesignSessions(prev => [...prev, { id, title: `Sesión ${prev.length + 1}` }]);
+    setActiveDesignSessionId(id);
+  }
+
+  function closeDesignSession(id) {
+    setDesignSessions(prev => {
+      const next = prev.filter(s => s.id !== id);
+      if (activeDesignSessionId === id && next.length > 0) setActiveDesignSessionId(next[next.length - 1].id);
+      return next;
+    });
+  }
 
   const [activeFile, setActiveFile] = useState(null);
   const [fileTree, setFileTree] = useState([]);
@@ -569,6 +607,7 @@ export function App() {
         isSidebarOpen={isSidebarOpen}
         onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
         currentMode={currentMode}
+        setMode={setMode}
         onOpenDoctor={() => setIsDoctorOpen(true)}
         conversations={conversations}
         activeChatId={activeChatId}
@@ -588,9 +627,11 @@ export function App() {
           if (page === 'home') {
             setMode('chat');
           }
-          // ds / plugin / integrations render their own full-page route — no mode change
         }}
         isMaximized={isMaximized}
+        setIsMaximized={setIsMaximized}
+        onOpenSettings={() => setIsSettingsOpen(true)}
+        lang={lang}
       />
       
       <main className="app-main">
@@ -598,17 +639,16 @@ export function App() {
         <HeaderBar
           currentMode={currentMode}
           setMode={setMode}
-          onOpenDoctor={() => setIsDoctorOpen(true)}
           isSidebarOpen={isSidebarOpen}
           onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
-          theme={theme}
-          onToggleTheme={toggleTheme}
+          lang={lang}
         />
 
           {/* Full-page routes for global pages */}
           {activePage === 'ds' && <DesignSystemPage />}
           {activePage === 'plugin' && <PluginHubPage />}
           {activePage === 'integrations' && <IntegrationsPage />}
+          {activePage === 'projects' && <ProjectsPage lang={lang} />}
 
           {/* Workspace modes — only shown when no global page is active */}
           {(!activePage || activePage === 'home') && currentMode === 'chat' && (
@@ -631,46 +671,175 @@ export function App() {
               onMessagesChange={handleChatMessages}
               onEnsureChat={ensureActiveChat}
               onSetChatTitle={handleSetChatTitle}
+              lang={lang}
             />
           )}
           {(!activePage || activePage === 'home') && currentMode === 'code' && (
-            <CodeView
-              selectedModel={selectedModel}
-              activeFile={activeFile}
-              onOpenModelSelector={() => setIsModelSelectorOpen(true)}
-            />
+            <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+              <SessionTabs
+                sessions={codeSessions}
+                activeSessionId={activeCodeSessionId}
+                onSelect={setActiveCodeSessionId}
+                onNew={addCodeSession}
+                onClose={closeCodeSession}
+              />
+              <CodeView
+                selectedModel={selectedModel}
+                activeFile={activeFile}
+                onOpenModelSelector={() => setIsModelSelectorOpen(true)}
+                activeSessionId={activeCodeSessionId}
+              />
+            </div>
           )}
           {(!activePage || activePage === 'home') && currentMode === 'design' && (
-            <div style={{ display: 'flex', flex: 1, overflow: 'hidden', height: '100%' }}>
-              <DesignChatPanel
-                activePreset={activePreset}
-                onPresetSelect={setActivePreset}
-                onGenerateDesignUI={handleGenerateDesignUI}
-                designVersions={designVersions}
-                onRestoreVersion={handleRestoreVersion}
-                artifactType={artifactType}
-                onArtifactTypeChange={setArtifactType}
-                selectedProvider={selectedProvider}
-                setSelectedProvider={setSelectedProvider}
-                selectedModel={selectedModel}
-                setSelectedModel={setSelectedModel}
-                reasoning={reasoning}
-                setReasoning={setReasoning}
-                tokenUsage={designTokenUsage}
-                pickedElement={pickedElement}
-                onClearPickedElement={() => setPickedElement(null)}
-                providersConfig={providersConfig}
-                onOpenProviderManager={() => setIsProviderManagerOpen(true)}
-              />
-              <DesignView
-                htmlCode={designHtmlCode}
-                activePreset={activePreset}
-                activePage={activePage}
-                onSelectPreset={setActivePreset}
-                onResetPreset={() => setDesignHtmlCode(designPresets[activePreset || 'landing'])}
-                artifactType={artifactType}
-                onElementPicked={setPickedElement}
-              />
+            <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+              {designSessions.length > 0 && (
+                <SessionTabs
+                  sessions={designSessions}
+                  activeSessionId={activeDesignSessionId}
+                  onSelect={setActiveDesignSessionId}
+                  onNew={addDesignSession}
+                  onClose={closeDesignSession}
+                />
+              )}
+              <div style={{ display: 'flex', flex: 1, overflow: 'hidden', height: '100%' }}>
+                {designSessions.length > 0 ? (
+                  <>
+                    <DesignChatPanel
+                      activePreset={activePreset}
+                      onPresetSelect={setActivePreset}
+                      onGenerateDesignUI={handleGenerateDesignUI}
+                      designVersions={designVersions}
+                      onRestoreVersion={handleRestoreVersion}
+                      artifactType={artifactType}
+                      onArtifactTypeChange={setArtifactType}
+                      selectedProvider={selectedProvider}
+                      setSelectedProvider={setSelectedProvider}
+                      selectedModel={selectedModel}
+                      setSelectedModel={setSelectedModel}
+                      reasoning={reasoning}
+                      setReasoning={setReasoning}
+                      tokenUsage={designTokenUsage}
+                      pickedElement={pickedElement}
+                      onClearPickedElement={() => setPickedElement(null)}
+                      providersConfig={providersConfig}
+                      onOpenProviderManager={() => setIsProviderManagerOpen(true)}
+                    />
+                    <DesignView
+                      htmlCode={designHtmlCode}
+                      activePreset={activePreset}
+                      activePage={activePage}
+                      onSelectPreset={setActivePreset}
+                      onResetPreset={() => setDesignHtmlCode(designPresets[activePreset || 'landing'])}
+                      artifactType={artifactType}
+                      onElementPicked={setPickedElement}
+                      activeSessionId={activeDesignSessionId}
+                    />
+                  </>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflowY: 'auto', padding: '24px', background: 'var(--colors-canvas)', gap: '20px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
+                      <div 
+                        onClick={addDesignSession} 
+                        style={{ 
+                          width: '100%', 
+                          maxWidth: '640px', 
+                          padding: '32px', 
+                          background: 'var(--colors-surface-card)', 
+                          border: '1px solid var(--colors-hairline)', 
+                          borderRadius: '12px', 
+                          textAlign: 'center', 
+                          cursor: 'pointer', 
+                          transition: 'all var(--transition-normal)' 
+                        }} 
+                        className="library-create-card"
+                      >
+                        <h3 style={{ fontFamily: 'var(--font-mono)', color: 'var(--colors-ink)', margin: '0 0 6px 0', fontSize: '18px', fontWeight: 'bold' }}>Crear Nuevo Diseño</h3>
+                        <p style={{ color: 'var(--colors-muted)', margin: 0, fontSize: '12px' }}>Inicia una sesión de copilot interactiva para iterar tu UI</p>
+                      </div>
+                    </div>
+                    
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginTop: '16px' }}>
+                      <div style={{ background: 'var(--colors-surface-card)', border: '1px solid var(--colors-hairline)', borderRadius: '6px', padding: '20px' }}>
+                        <h3 style={{ fontFamily: 'var(--font-mono)', color: 'var(--colors-ink)', marginBottom: '12px', fontSize: '14px', borderBottom: '1px solid var(--colors-hairline)', paddingBottom: '6px' }}>Templates</h3>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                          {Object.keys(designPresets).map(preset => (
+                            <button
+                              key={preset}
+                              onClick={() => {
+                                setActivePreset(preset);
+                                addDesignSession();
+                              }}
+                              style={{ padding: '10px', background: 'var(--colors-surface-dark-soft)', border: '1px solid var(--colors-hairline)', color: 'var(--colors-ink)', borderRadius: '4px', textAlign: 'left', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: '11px' }}
+                            >
+                              {preset}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div style={{ background: 'var(--colors-surface-card)', border: '1px solid var(--colors-hairline)', borderRadius: '6px', padding: '20px' }}>
+                        <h3 style={{ fontFamily: 'var(--font-mono)', color: 'var(--colors-ink)', marginBottom: '12px', fontSize: '14px', borderBottom: '1px solid var(--colors-hairline)', paddingBottom: '6px' }}>Design Systems</h3>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                          <div style={{ padding: '12px', background: 'var(--colors-surface-dark-soft)', border: '1px solid var(--colors-hairline-strong)', borderRadius: '4px', fontFamily: 'var(--font-mono)', fontSize: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ color: 'var(--colors-ink)', fontWeight: 'bold' }}>Stark integrated system</span>
+                            <span style={{ color: 'var(--colors-primary)', fontSize: '10px', fontWeight: 'bold' }}>ACTIVE</span>
+                          </div>
+                          <div style={{ padding: '12px', background: 'var(--colors-surface-dark-soft)', border: '1px solid var(--colors-hairline)', borderRadius: '4px', fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--colors-muted)' }}>
+                            Custom fig system (Stub)
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ background: 'var(--colors-surface-card)', border: '1px solid var(--colors-hairline)', borderRadius: '6px', padding: '20px', marginTop: '16px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', borderBottom: '1px solid var(--colors-hairline)', paddingBottom: '6px' }}>
+                        <h3 style={{ fontFamily: 'var(--font-mono)', color: 'var(--colors-ink)', margin: 0, fontSize: '14px' }}>Library Assets</h3>
+                        <button onClick={addDesignSession} className="send-btn-stark" style={{ fontSize: '11px', padding: '4px 10px', height: 'auto', background: 'var(--colors-primary)', color: 'var(--colors-canvas)', border: 'none', borderRadius: '4px', cursor: 'pointer', fontFamily: 'var(--font-mono)' }}>
+                          Crear Nuevo Diseño
+                        </button>
+                      </div>
+
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: 'var(--font-mono)', fontSize: '12px', textAlign: 'left', color: 'var(--colors-ink)' }}>
+                        <thead>
+                          <tr style={{ borderBottom: '1px solid var(--colors-hairline-strong)', color: 'var(--colors-muted)' }}>
+                            <th style={{ padding: '8px' }}>Name</th>
+                            <th style={{ padding: '8px' }}>Type</th>
+                            <th style={{ padding: '8px' }}>Size</th>
+                            <th style={{ padding: '8px' }}>Owner</th>
+                            <th style={{ padding: '8px' }}>Access</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {[
+                            { name: 'landing_mockup.fig', size: '1.2 MB', type: 'Design', owner: 'current', access: 'private' },
+                            { name: 'dashboard_preview.png', size: '240 KB', type: 'Images', owner: 'current', access: 'private' },
+                            { name: 'intro_video.mp4', size: '14.5 MB', type: 'Video', owner: 'current', access: 'private' },
+                            { name: 'design_tokens.json', size: '12 KB', type: 'Design', owner: 'current', access: 'private' }
+                          ].map((asset, index) => (
+                            <tr 
+                              key={asset.name} 
+                              onClick={addDesignSession}
+                              style={{ 
+                                borderBottom: '1px solid var(--colors-hairline)', 
+                                cursor: 'pointer',
+                                background: index % 2 === 0 ? 'transparent' : 'rgba(255, 255, 255, 0.02)'
+                              }}
+                              className="library-table-row"
+                            >
+                              <td style={{ padding: '8px', fontWeight: 'bold' }}>{asset.name}</td>
+                              <td style={{ padding: '8px' }}>{asset.type}</td>
+                              <td style={{ padding: '8px' }}>{asset.size}</td>
+                              <td style={{ padding: '8px' }}>{asset.owner}</td>
+                              <td style={{ padding: '8px' }}>{asset.access}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           )}
       </main>
@@ -690,6 +859,7 @@ export function App() {
       <DoctorModal
         isOpen={isDoctorOpen}
         onClose={() => setIsDoctorOpen(false)}
+        lang={lang}
       />
 
       <ProviderManagerModal
@@ -714,6 +884,15 @@ export function App() {
       <UnlockModal
         isOpen={isLocked}
         onUnlock={() => setIsLocked(false)}
+      />
+
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        theme={theme}
+        onToggleTheme={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+        lang={lang}
+        onToggleLang={() => setLang(lang === 'es' ? 'en' : 'es')}
       />
     </div>
   );

@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'preact/hooks';
 import { Paperclip, Sparkles, Send, Brain, ChevronDown, ChevronUp, Cpu, X, Settings2, Image as ImageIcon, Video, Presentation, Mic, ArrowUp, Plus } from 'lucide-react';
 import { Logo } from './Logo';
 import { CustomSelect } from './CustomSelect';
+import { translations } from '../i18n';
 
 export function ChatView({
   selectedModel,
@@ -22,8 +23,10 @@ export function ChatView({
   messages,
   onMessagesChange,
   onEnsureChat,
-  onSetChatTitle
+  onSetChatTitle,
+  lang = 'es'
 }) {
+  const t = translations[lang] ? translations[lang].chat : translations.es.chat;
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [tokensUsed, setTokensUsed] = useState(0);
@@ -33,6 +36,73 @@ export function ChatView({
   const [openThinkingIdx, setOpenThinkingIdx] = useState({});
   const [isDropupOpen, setIsDropupOpen] = useState(false);
   const fileInputRef = useRef(null);
+  const dropupRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (isDropupOpen && dropupRef.current && !dropupRef.current.contains(e.target)) {
+        setIsDropupOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isDropupOpen]);
+
+  const [isRecording, setIsRecording] = useState(false);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioChunksRef.current = [];
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
+        const reader = new FileReader();
+        reader.onloadend = async () => {
+          const base64Data = reader.result.split(',')[1];
+          try {
+            const { invoke } = await import('@tauri-apps/api/core');
+            const text = await invoke('voice_transcribe', { audioBase64: base64Data });
+            setInput(prev => prev ? `${prev} ${text}` : text);
+          } catch (e) {
+            alert(e);
+          }
+        };
+        reader.readAsDataURL(audioBlob);
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+    } catch (err) {
+      alert("No se pudo acceder al micrófono: " + err.message);
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+    }
+  };
+
+  const handleMicClick = () => {
+    if (isRecording) {
+      stopRecording();
+    } else {
+      startRecording();
+    }
+  };
 
   const chatIdRef = useRef(activeChatId);
   useEffect(() => {
@@ -300,7 +370,7 @@ export function ChatView({
             <Logo size={84} />
             <h1 className="app-brand-wordmark">Stark</h1>
             <span style={{ fontSize: '13px', color: 'var(--colors-muted)', fontFamily: 'var(--font-mono)' }}>
-              Agente de codificación para Linux
+              {t.subtitle}
             </span>
           </div>
         )}
@@ -312,7 +382,7 @@ export function ChatView({
               <div className="thinking-block">
                 <div className="thinking-header" onClick={() => toggleThinking(idx)}>
                   <Brain size={14} strokeWidth={1.75} style={{ color: 'var(--colors-body-strong)' }} />
-                  <span>Pensamiento del Agente (CoT)</span>
+                  <span>{t.reasoning} (CoT)</span>
                   <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px' }}>
                     {openThinkingIdx[idx] ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
                   </span>
@@ -353,7 +423,7 @@ export function ChatView({
             <div className="thinking-block">
               <div className="thinking-header">
                 <Brain size={14} strokeWidth={1.75} />
-                <span>Razonando respuesta en {agentMode === 'plan' ? 'Modo Plan' : 'Modo Build'}...</span>
+                <span>{lang === 'es' ? 'Razonando respuesta en' : 'Reasoning response in'} {agentMode === 'plan' ? t.planMode : t.buildMode}...</span>
               </div>
             </div>
           </div>
@@ -372,16 +442,9 @@ export function ChatView({
                 className="btn-secondary"
                 style={{ fontSize: '12px', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '6px' }}
               >
-                {selectedModel || 'Seleccionar Modelo'} <ChevronUp size={14} />
+                {selectedModel || t.noModel} <ChevronUp size={14} />
               </button>
 
-              <button
-                onClick={onOpenProviderManager}
-                title="Gestionar proveedores"
-                style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--colors-surface-dark)', border: '1px solid var(--colors-hairline)', color: 'var(--colors-body-strong)', borderRadius: '4px', padding: '8px 10px', fontSize: '12px', fontFamily: 'var(--font-mono)', cursor: 'pointer' }}
-              >
-                <Settings2 size={14} strokeWidth={1.75} />
-              </button>
 
               <span className={isLocal ? 'badge-offline' : 'badge-cloud'} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                 <Cpu size={12} strokeWidth={1.75} />
@@ -390,12 +453,13 @@ export function ChatView({
             </div>
 
             </div>
-          </div>
 
           {/* Main Prompt Textarea */}
           <textarea
             className="chat-textarea"
-            placeholder={agentMode === 'plan' ? '¿Qué quieres diseñar o analizar hoy? Escribe una consulta o instrucción...' : 'Describe la modificación de código para editar a disco en Stark...'}
+            placeholder={agentMode === 'plan' 
+              ? (lang === 'es' ? '¿Qué quieres diseñar o analizar hoy? Escribe una consulta o instrucción...' : 'What do you want to design or analyze today? Type a query or instruction...')
+              : (lang === 'es' ? 'Describe la modificación de código para editar a disco en Stark...' : 'Describe the code modification to write to disk in Stark...')}
             value={input}
             onInput={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -407,7 +471,11 @@ export function ChatView({
           {/* Bottom Toolbar inside Prompt Container */}
           <div className="chat-input-toolbar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', paddingTop: '8px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-              <div style={{ position: 'relative' }}>
+              <div 
+                ref={dropupRef} 
+                style={{ position: 'relative' }}
+                onMouseLeave={() => setIsDropupOpen(false)}
+              >
                 <button 
                    onClick={() => setIsDropupOpen(!isDropupOpen)}
                    style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--colors-surface-dark-elevated)', border: '1px solid var(--colors-hairline)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--colors-ink)' }}
@@ -429,7 +497,7 @@ export function ChatView({
                        onClick={() => { fileInputRef.current?.click(); }}
                        style={{ background: 'transparent', border: 'none', padding: '6px 8px', textAlign: 'left', cursor: 'pointer', color: 'var(--colors-ink)', fontSize: '12px', borderRadius: '4px', display: 'flex', alignItems: 'center' }}
                     >
-                      <Paperclip size={14} style={{ marginRight: '6px' }} /> Adjuntar archivos
+                      <Paperclip size={14} style={{ marginRight: '6px' }} /> {lang === 'es' ? 'Adjuntar archivos' : 'Attach files'}
                     </button>
                     
                     <div style={{ fontSize: '11px', color: 'var(--colors-muted)', padding: '4px 8px', marginTop: '4px', borderTop: '1px solid var(--colors-hairline)' }}>Skills</div>
@@ -440,7 +508,7 @@ export function ChatView({
                            onClick={() => { setSelectedSkill(s); setIsDropupOpen(false); }}
                            style={{ background: 'transparent', border: 'none', padding: '6px 8px', textAlign: 'left', cursor: 'pointer', color: 'var(--colors-ink)', fontSize: '12px', borderRadius: '4px' }}
                          >
-                           /{s.name}
+                            {"/"}{s.name}
                          </button>
                       ))}
                     </div>
@@ -448,36 +516,18 @@ export function ChatView({
                 )}
               </div>
 
-              {selectedSkill && (
-                <span style={{ fontSize: '11.5px', fontFamily: 'var(--font-mono)', background: 'var(--colors-surface-dark-elevated)', color: 'var(--colors-ink-deep)', padding: '4px 10px', borderRadius: '16px', border: '1px solid var(--colors-hairline-strong)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Sparkles size={12} strokeWidth={1.75} />
-                  <span>/{selectedSkill.name}</span>
-                  <button onClick={() => setSelectedSkill(null)} style={{ background: 'transparent', border: 'none', color: 'var(--colors-muted)', cursor: 'pointer', display: 'flex' }}>
-                    <X size={12} />
-                  </button>
-                </span>
-              )}
-              {attachments.map((att, i) => (
-                <span key={i} style={{ fontSize: '11.5px', fontFamily: 'var(--font-mono)', background: 'var(--colors-surface-dark-elevated)', color: 'var(--colors-ink)', padding: '4px 10px', borderRadius: '16px', border: '1px solid var(--colors-hairline)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span>Doc: {att.name}</span>
-                  <button onClick={() => setAttachments((prev) => prev.filter((_, idx) => idx !== i))} style={{ background: 'transparent', border: 'none', color: 'var(--colors-muted)', cursor: 'pointer', display: 'flex' }}>
-                    <X size={12} />
-                  </button>
-                </span>
-              ))}
-
               <div className="mode-toggle-group" style={{ margin: 0 }}>
                 <button
                   className={`btn-mode-toggle ${agentMode === 'plan' ? 'active' : ''}`}
                   onClick={() => setAgentMode('plan')}
                 >
-                  Plan
+                  {t.planMode}
                 </button>
                 <button
                   className={`btn-mode-toggle ${agentMode === 'build' ? 'active' : ''}`}
                   onClick={() => setAgentMode('build')}
                 >
-                  Build
+                  {t.buildMode}
                 </button>
               </div>
 
@@ -496,33 +546,55 @@ export function ChatView({
                 <Brain size={14} strokeWidth={1.75} />
                 CoT
               </button>
+
+              {selectedSkill && (
+                <span style={{ fontSize: '11.5px', fontFamily: 'var(--font-mono)', background: 'var(--colors-surface-dark-elevated)', color: 'var(--colors-ink-deep)', padding: '4px 10px', borderRadius: '16px', border: '1px solid var(--colors-hairline-strong)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Sparkles size={12} strokeWidth={1.75} />
+                  <span>{"/"}{selectedSkill.name}</span>
+                  <button onClick={() => setSelectedSkill(null)} style={{ background: 'transparent', border: 'none', color: 'var(--colors-muted)', cursor: 'pointer', display: 'flex' }}>
+                    <X size={12} />
+                  </button>
+                </span>
+              )}
+              {attachments.map((att, i) => (
+                <span key={i} style={{ fontSize: '11.5px', fontFamily: 'var(--font-mono)', background: 'var(--colors-surface-dark-elevated)', color: 'var(--colors-ink)', padding: '4px 10px', borderRadius: '16px', border: '1px solid var(--colors-hairline)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span>Doc: {att.name}</span>
+                  <button onClick={() => setAttachments((prev) => prev.filter((_, idx) => idx !== i))} style={{ background: 'transparent', border: 'none', color: 'var(--colors-muted)', cursor: 'pointer', display: 'flex' }}>
+                    <X size={12} />
+                  </button>
+                </span>
+              ))}
             </div>
 
-            <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+               <span style={{ fontSize: '10.5px', fontFamily: 'var(--font-mono)', color: 'var(--colors-muted)' }}>
+                 Tokens: {tokensUsed}
+               </span>
                {input.trim() === '' ? (
                  <button 
-                   onClick={() => console.log('Mic clicked')}
-                   style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'transparent', border: '1px solid var(--colors-hairline)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--colors-ink)' }}
+                   onClick={handleMicClick}
+                   style={{ 
+                     width: '32px', height: '32px', borderRadius: '50%', 
+                     background: isRecording ? 'var(--colors-primary, #ffffff)' : 'transparent', 
+                     border: '1px solid var(--colors-hairline)', 
+                     display: 'flex', alignItems: 'center', justifyContent: 'center', 
+                     cursor: 'pointer', color: isRecording ? 'var(--colors-canvas, #1e1e1e)' : 'var(--colors-ink)'
+                   }}
+                   title={isRecording ? (lang === 'es' ? "Detener grabación y transcribir" : "Stop recording and transcribe") : (lang === 'es' ? "Instala whisper para dictado" : "Install whisper for dictation")}
                  >
-                   <Mic size={16} strokeWidth={1.75} />
+                   <Mic size={16} strokeWidth={1.75} style={{ color: isRecording ? 'var(--colors-canvas, #1e1e1e)' : 'inherit' }} />
                  </button>
                ) : (
                  <button 
                    onClick={handleSend}
                    disabled={isLoading}
-                   style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--colors-primary, #8c6253)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#fff' }}
+                   style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--colors-primary, #ffffff)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--colors-canvas, #1e1e1e)' }}
                  >
                    {isLoading ? <span style={{ fontSize: '10px' }}>...</span> : <ArrowUp size={16} strokeWidth={1.75} />}
                  </button>
                )}
             </div>
           </div>
-        </div>
-
-        <div style={{ display: 'flex', justifyContent: 'flex-start', marginTop: '6px', padding: '0 4px' }}>
-          <span style={{ fontSize: '10.5px', fontFamily: 'var(--font-mono)', color: 'var(--colors-muted)' }}>
-            Tokens: {tokensUsed}
-          </span>
         </div>
 
         {input.trim() === '' && (

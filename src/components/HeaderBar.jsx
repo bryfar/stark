@@ -1,11 +1,15 @@
 import { h } from 'preact';
-import { PanelLeftClose, PanelLeftOpen, Stethoscope, MessageSquare, Code2, Layout, Sun, Moon, Minus, Square, X } from 'lucide-react';
+import { MessageSquare, Code2, Layout, Minus, Square, X } from 'lucide-react';
+import { translations } from '../i18n';
 
-export function HeaderBar({ currentMode, setMode, onOpenDoctor, isSidebarOpen, onToggleSidebar, theme, onToggleTheme }) {
+export function HeaderBar({ currentMode, setMode, isSidebarOpen, onToggleSidebar, lang = 'es' }) {
+  const t = translations[lang] ? translations[lang].header : translations.es.header;
+  const tSidebar = translations[lang] ? translations[lang].sidebar : translations.es.sidebar;
+
   const modes = [
-    { id: 'chat', label: 'Chat General', icon: MessageSquare },
-    { id: 'code', label: 'Modo Code', icon: Code2 },
-    { id: 'design', label: 'Modo Design', icon: Layout }
+    { id: 'chat', label: tSidebar.chat, icon: MessageSquare },
+    { id: 'code', label: tSidebar.code, icon: Code2 },
+    { id: 'design', label: tSidebar.design, icon: Layout }
   ];
 
   const windowAction = async (action) => {
@@ -22,38 +26,12 @@ export function HeaderBar({ currentMode, setMode, onOpenDoctor, isSidebarOpen, o
 
   return (
     <header className="header-bar" data-tauri-drag-region>
-      {/* Sidebar Toggle & Brand Badge */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-        <button
-          onClick={onToggleSidebar}
-          title={isSidebarOpen ? 'Ocultar Sidebar' : 'Mostrar Sidebar'}
-          style={{
-            fontSize: '12px',
-            fontFamily: 'var(--font-mono)',
-            padding: '5px 10px',
-            background: 'var(--colors-surface-dark)',
-            color: 'var(--colors-body-strong)',
-            borderRadius: '4px',
-            border: '1px solid var(--colors-hairline)',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px'
-          }}
-        >
-          {isSidebarOpen ? <PanelLeftClose size={14} strokeWidth={1.75} /> : <PanelLeftOpen size={14} strokeWidth={1.75} />}
-          <span>Sidebar</span>
-        </button>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <span className="header-brand" style={{ fontFamily: 'var(--font-mono)', fontSize: '13px', fontWeight: '700', color: 'var(--colors-ink)' }}>
-            Stark Workspace
-          </span>
-        </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
+        {/* Brand text removed */}
       </div>
 
       {/* Centered Workspace Mode Tabs */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', justifyContent: 'center' }}>
         {modes.map((m) => {
           const isActive = currentMode === m.id;
           const IconComp = m.icon;
@@ -85,47 +63,7 @@ export function HeaderBar({ currentMode, setMode, onOpenDoctor, isSidebarOpen, o
       </div>
 
       {/* Theme Switcher & System Diagnostic Trigger */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <button
-          onClick={onToggleTheme}
-          title="Alternar Tema (Dark Monocromo ↔ Open Design Light)"
-          style={{
-            fontSize: '12px',
-            fontFamily: 'var(--font-mono)',
-            padding: '5px 10px',
-            background: 'var(--colors-surface-dark)',
-            color: 'var(--colors-body-strong)',
-            borderRadius: '4px',
-            border: '1px solid var(--colors-hairline)',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px'
-          }}
-        >
-          {theme === 'light' ? <Moon size={14} strokeWidth={1.75} /> : <Sun size={14} strokeWidth={1.75} />}
-          <span>{theme === 'light' ? 'Dark' : 'Light'}</span>
-        </button>
-
-        <button
-          onClick={onOpenDoctor}
-          style={{
-            fontSize: '12px',
-            fontFamily: 'var(--font-mono)',
-            padding: '5px 12px',
-            background: 'var(--colors-surface-dark)',
-            color: 'var(--colors-body-strong)',
-            borderRadius: '4px',
-            border: '1px solid var(--colors-hairline)',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px'
-          }}
-        >
-          <Stethoscope size={14} strokeWidth={1.75} />
-          <span>Stark Doctor</span>
-        </button>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, justifySelf: 'flex-end', justifyContent: 'flex-end' }}>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '2px', marginLeft: '8px', borderLeft: '1px solid var(--colors-hairline)', paddingLeft: '8px' }}>
           <button

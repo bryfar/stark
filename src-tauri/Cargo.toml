@@ -25,6 +25,7 @@ argon2 = "0.5"
 rand = "0.8"
 sysinfo = "0.30"
 dirs-next = "2.0"
+base64 = "0.22"
 
 
 
