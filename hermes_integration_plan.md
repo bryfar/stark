@@ -127,3 +127,11 @@ Para optimizar al máximo el arnés de Stark 2.0 y mejorar la autonomía en el m
 - **Aplicación en Stark (Bucle de Co-Evaluación Cowork):**
   - **Contrato de Sprint:** Antes de iniciar una tarea compleja de código, Stark instanciará un hilo de negociación donde el creador propone la implementación y el evaluador define los criterios de éxito (ej. verificar la compilación y los tests de integración en el Sandbox).
   - **Evaluador Escéptico:** Al terminar la generación de archivos, un subagente evaluador asíncrono (dotado de herramientas de auditoría y tests) ejecuta pruebas y califica el trabajo con un criterio rígido de aprobación. Si alguna métrica falla, el evaluador inyecta un reporte detallado con capturas o trazas de error al generador para iniciar el siguiente ciclo de refinamiento de forma 100% autónoma.
+
+### 6.3. Bucle de Testeo y Verificación de Código Automatizado (Anthropic Research Pattern)
+
+- **Principio:** Un agente de software exitoso no solo debe escribir el código, sino también ser capaz de auditar su sintaxis y generar pruebas automatizadas que verifiquen el cumplimiento del diseño y eviten regresiones.
+- **Aplicación en Stark:**
+  - **Autogeneración de Pruebas:** Al escribir un nuevo módulo en Rust (backend) o componente en Preact (frontend), el Generador debe escribir de manera obligatoria archivos de prueba unitaria (`.test.jsx` o bloques `#[cfg(test)]`).
+  - **Auditoría de Linter y Compilación:** El arnés ejecuta automáticamente comandos de formateo, compilación y linter (`cargo check`, `prettier`, etc.) para verificar la salud estructural antes de proceder.
+  - **Corridas de Tests en Sandbox:** El Evaluador ejecuta las pruebas unitarias generadas de forma autónoma. Si el test suite falla, el log de error es capturado e inyectado como feedback de vuelta al Generador para que repare el código automáticamente, logrando un ciclo de desarrollo cerrado.
