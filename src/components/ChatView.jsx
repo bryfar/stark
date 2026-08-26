@@ -146,6 +146,7 @@ export function ChatView({
     (messages || []).reduce((n, m) => n + (m.text || "").length, 0) / 4
   );
   const suggestCompact = messages.length >= 8 && estTokens > compactThreshold;
+  const suggestNewSession = estTokens > compactThreshold * 0.4;
 
   // @ dropup state
   const [atDropdownOpen, setAtDropdownOpen] = useState(false);
@@ -1203,6 +1204,47 @@ export function ChatView({
               }}
             >
               {t.compactAction}
+            </button>
+          </div>
+        )}
+
+        {suggestNewSession && !isLoading && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: "12px",
+              margin: "0 16px 10px",
+              padding: "10px 14px",
+              background: "rgba(245, 158, 11, 0.1)",
+              border: "1px solid rgba(245, 158, 11, 0.3)",
+              borderRadius: "8px",
+              fontFamily: "var(--font-mono)",
+              fontSize: "12px",
+              color: "var(--colors-ink)",
+            }}
+          >
+            <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <Zap size={14} strokeWidth={1.75} style={{ color: "#f59e0b" }} />
+              <span>
+                {lang === "es"
+                  ? `Alerta de Contexto: Has alcanzado el 40% de la capacidad de la sesión (${estTokens.toLocaleString()} tokens). Se sugiere bifurcar este chat para continuar con grafos y evitar lentitud.`
+                  : `Context Warning: You reached 40% of the session capacity (${estTokens.toLocaleString()} tokens). We suggest forking this chat to continue with graph memory and avoid lag.`}
+              </span>
+            </span>
+            <button
+              onClick={() => onForkChat && onForkChat(activeChatId)}
+              className="btn-secondary"
+              style={{
+                fontSize: "11px",
+                padding: "6px 12px",
+                borderRadius: "6px",
+                whiteSpace: "nowrap",
+                borderColor: "rgba(245, 158, 11, 0.4)",
+              }}
+            >
+              {lang === "es" ? "Bifurcar" : "Fork"}
             </button>
           </div>
         )}
