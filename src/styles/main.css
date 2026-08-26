@@ -467,7 +467,7 @@ select option,
   flex-direction: column;
   background: var(--colors-canvas);
   position: relative;
-  overflow: hidden;
+  overflow-y: auto;
 }
 
 /* Header Bar */

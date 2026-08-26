@@ -37,7 +37,7 @@ export function UsagePage() {
   const maxTokens = Math.max(...byModel.map(m => m.total_tokens), 1);
 
   return (
-    <div style={{ padding: '24px', maxWidth: '800px', margin: '0 auto' }}>
+    <div style={{ padding: '24px', maxWidth: '800px', margin: '0 auto', height: '100%', overflowY: 'auto', boxSizing: 'border-box' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
         <BarChart3 size={22} strokeWidth={1.75} />
         <h1 style={{ margin: 0, fontSize: '20px', fontWeight: 600, fontFamily: 'var(--font-mono)', color: 'var(--colors-ink)' }}>
