@@ -107,3 +107,23 @@ graph TD
 - **Suite de Backend:** Código Rust compilado de forma nativa sin errores de enlace de librerías.
 - **Suite de Interfaz:** Componentes interactivos reactivos en Preact con soporte de entrada de audio continuo en tiempo real.
 - **Tests de Regresión:** Pruebas unitarias y de integración que verifiquen el árbol de sesiones y la lógica de bypass de permisos.
+
+---
+
+## 6. Lecciones e Ingeniería de Harnesses Modernos (Anthropic & Vercel)
+
+Para optimizar al máximo el arnés de Stark 2.0 y mejorar la autonomía en el modo de co-trabajo (Cowork), integramos dos patrones fundamentales basados en el estado del arte de la industria:
+
+### 6.1. Reducción Radical de Herramientas (Vercel Agent Pattern)
+
+- **Principio:** Vercel demostró que remover el 80% de las herramientas micro-optimizadas (como APIs de bases de datos específicas o wrappers REST) y cambiarlas por un acceso genérico y potente al sistema de archivos y ejecución de terminal en Sandbox aumenta drásticamente la resiliencia y el porcentaje de éxito del agente.
+- **Aplicación en Stark:**
+  - Mantener el catálogo de herramientas del agente limpio y enfocado a propósitos generales (`terminal_execute`, `file_write`, `file_read`, `search_graph`).
+  - Evitar inyectar micro-herramientas de baja abstracción que saturen el espacio de tokens y confundan la toma de decisiones del modelo.
+
+### 6.2. Arquitectura Generador-Evaluador Multi-Agente (Anthropic GAN)
+
+- **Principio:** Los LLMs sufren de sesgo de indulgencia al autoevaluarse, aprobando con facilidad código mediocre o con errores visuales sutiles. Anthropic resolvió esto separando físicamente el rol de creación del rol de evaluación mediante dos agentes asíncronos independientes.
+- **Aplicación en Stark (Bucle de Co-Evaluación Cowork):**
+  - **Contrato de Sprint:** Antes de iniciar una tarea compleja de código, Stark instanciará un hilo de negociación donde el creador propone la implementación y el evaluador define los criterios de éxito (ej. verificar la compilación y los tests de integración en el Sandbox).
+  - **Evaluador Escéptico:** Al terminar la generación de archivos, un subagente evaluador asíncrono (dotado de herramientas de auditoría y tests) ejecuta pruebas y califica el trabajo con un criterio rígido de aprobación. Si alguna métrica falla, el evaluador inyecta un reporte detallado con capturas o trazas de error al generador para iniciar el siguiente ciclo de refinamiento de forma 100% autónoma.
