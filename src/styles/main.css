@@ -1439,6 +1439,10 @@ select option,
   }
 }
 
+.spin {
+  animation: spin 1s linear infinite;
+}
+
 @keyframes voicePulse {
   0%,
   100% {

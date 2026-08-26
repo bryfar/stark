@@ -20,6 +20,8 @@ import {
   Rocket,
   Server,
   Mic,
+  BarChart3,
+  Package,
 } from "lucide-react";
 import { translations } from "../i18n";
 
@@ -91,6 +93,16 @@ export function Sidebar({
       id: "integrations",
       icon: <Puzzle size={18} strokeWidth={1.75} />,
       label: "Integrations",
+    },
+    {
+      id: "usage",
+      icon: <BarChart3 size={18} strokeWidth={1.75} />,
+      label: "Uso de Tokens",
+    },
+    {
+      id: "skills",
+      icon: <Package size={18} strokeWidth={1.75} />,
+      label: "Skills",
     },
   ];
 

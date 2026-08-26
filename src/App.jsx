@@ -18,6 +18,8 @@ import { DesignSystemPage } from "./components/pages/DesignSystemPage";
 import { PluginHubPage } from "./components/pages/PluginHubPage";
 import { IntegrationsPage } from "./components/pages/IntegrationsPage";
 import { ProjectsPage } from "./components/pages/ProjectsPage";
+import { UsagePage } from "./components/pages/UsagePage";
+import { SkillsPage } from "./components/pages/SkillsPage";
 import { SessionTabs } from "./components/SessionTabs";
 import { VoiceAssistantModal } from "./components/VoiceAssistantModal";
 
@@ -1013,6 +1015,8 @@ export function App() {
         {activePage === "plugin" && <PluginHubPage />}
         {activePage === "integrations" && <IntegrationsPage />}
         {activePage === "projects" && <ProjectsPage lang={lang} />}
+        {activePage === "usage" && <UsagePage />}
+        {activePage === "skills" && <SkillsPage />}
 
         {/* Workspace modes — only shown when no global page is active */}
         {(!activePage || activePage === "home") && currentMode === "chat" && (
