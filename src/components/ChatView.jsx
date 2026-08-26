@@ -68,8 +68,26 @@ export function ChatView({
   const [customAgents, setCustomAgents] = useState([]);
   const [customPlugins, setCustomPlugins] = useState([]);
   const [assetsVersion, setAssetsVersion] = useState(0);
+  const [activeArtifact, setActiveArtifact] = useState(null);
   const fileInputRef = useRef(null);
   const dropupRef = useRef(null);
+
+  const findArtifacts = (text) => {
+    if (!text) return null;
+    const htmlMatch = text.match(/```html\n([\s\S]*?)\n```/);
+    if (htmlMatch) {
+      return { type: "html", title: "HTML Preview", content: htmlMatch[1] };
+    }
+    const mermaidMatch = text.match(/```mermaid\n([\s\S]*?)\n```/);
+    if (mermaidMatch) {
+      return {
+        type: "mermaid",
+        title: "Mermaid Diagram",
+        content: mermaidMatch[1],
+      };
+    }
+    return null;
+  };
 
   // Compactation heuristic (D-t2): suggest once the estimated token count
   // (chars/4) crosses the provider threshold. Conservative floor so the banner
@@ -305,12 +323,21 @@ export function ChatView({
               if (last && last.sender === "assistant" && last.isStreaming) {
                 return [
                   ...list.slice(0, -1),
-                  { ...last, text: last.text + payload.token },
+                  {
+                    ...last,
+                    text: last.text + payload.token,
+                    model: selectedModel,
+                  },
                 ];
               }
               return [
                 ...list,
-                { sender: "assistant", text: payload.token, isStreaming: true },
+                {
+                  sender: "assistant",
+                  text: payload.token,
+                  isStreaming: true,
+                  model: selectedModel,
+                },
               ];
             });
           }
@@ -792,758 +819,916 @@ export function ChatView({
   };
 
   return (
-    <div className="chat-wrapper">
-      <div className="messages-list">
-        {messages.length === 0 && !isLoading && (
-          <div className="chat-empty-state">
-            <Logo size={84} />
-            <h1 className="app-brand-wordmark">Stark</h1>
-            <span
-              style={{
-                fontSize: "13px",
-                color: "var(--colors-muted)",
-                fontFamily: "var(--font-mono)",
-              }}
-            >
-              {t.subtitle}
-            </span>
-          </div>
-        )}
-        {messages.map((msg, idx) => (
-          <div className={`message-bubble ${msg.sender}`} key={idx}>
-            {msg.thinking && (
-              <div className="thinking-block">
-                <div
-                  className="thinking-header"
-                  onClick={() => toggleThinking(idx)}
-                >
-                  <Brain
-                    size={14}
-                    strokeWidth={1.75}
-                    style={{ color: "var(--colors-body-strong)" }}
-                  />
-                  <span>{t.reasoning} (CoT)</span>
-                  <span
-                    style={{
-                      marginLeft: "auto",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "4px",
-                      fontSize: "10px",
-                    }}
-                  >
-                    {openThinkingIdx[idx] ? (
-                      <ChevronUp size={12} />
-                    ) : (
-                      <ChevronDown size={12} />
-                    )}
-                  </span>
-                </div>
-                {openThinkingIdx[idx] && (
-                  <div className="thinking-content">{msg.thinking}</div>
-                )}
-              </div>
-            )}
-            <div>
-              <MarkdownRenderer content={msg.text} />
-            </div>
-            {msg.actions && msg.actions.length > 0 && (
-              <div
+    <div
+      className="chat-wrapper"
+      style={{
+        display: "flex",
+        flexDirection: "row",
+        height: "100%",
+        width: "100%",
+        overflow: "hidden",
+      }}
+    >
+      <div
+        style={{
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          height: "100%",
+          minWidth: 0,
+          borderRight: activeArtifact
+            ? "1px solid var(--colors-hairline)"
+            : "none",
+        }}
+      >
+        <div className="messages-list">
+          {messages.length === 0 && !isLoading && (
+            <div className="chat-empty-state">
+              <Logo size={84} />
+              <h1 className="app-brand-wordmark">Stark</h1>
+              <span
                 style={{
-                  marginTop: "14px",
-                  display: "flex",
-                  gap: "10px",
-                  flexWrap: "wrap",
+                  fontSize: "13px",
+                  color: "var(--colors-muted)",
+                  fontFamily: "var(--font-mono)",
                 }}
               >
-                {msg.actions.map((action, ai) => (
-                  <button
-                    className="btn-secondary"
-                    onClick={() => {
-                      action.type === "edit"
-                        ? setProposedEdit(action.edit)
-                        : action.type === "command" &&
-                          setProposedCommand(action.command);
-                    }}
-                    style={{ fontSize: "12px", padding: "6px 12px" }}
-                    key={ai}
+                {t.subtitle}
+              </span>
+            </div>
+          )}
+          {messages.map((msg, idx) => (
+            <div className={`message-bubble ${msg.sender}`} key={idx}>
+              {msg.thinking && (
+                <div className="thinking-block">
+                  <div
+                    className="thinking-header"
+                    onClick={() => toggleThinking(idx)}
                   >
-                    {action.label}
-                  </button>
-                ))}
+                    <Brain
+                      size={14}
+                      strokeWidth={1.75}
+                      style={{ color: "var(--colors-body-strong)" }}
+                    />
+                    <span>{t.reasoning} (CoT)</span>
+                    <span
+                      style={{
+                        marginLeft: "auto",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "4px",
+                        fontSize: "10px",
+                      }}
+                    >
+                      {openThinkingIdx[idx] ? (
+                        <ChevronUp size={12} />
+                      ) : (
+                        <ChevronDown size={12} />
+                      )}
+                    </span>
+                  </div>
+                  {openThinkingIdx[idx] && (
+                    <div className="thinking-content">{msg.thinking}</div>
+                  )}
+                </div>
+              )}
+              {msg.sender === "assistant" && msg.model && (
+                <div
+                  style={{
+                    fontSize: "10.5px",
+                    fontFamily: "var(--font-mono)",
+                    color: "var(--colors-muted)",
+                    marginBottom: "8px",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "4px",
+                    opacity: 0.85,
+                    padding: "1px 5px",
+                    background: "var(--colors-surface-dark-soft)",
+                    borderRadius: "3px",
+                    border: "1px solid var(--colors-hairline)",
+                  }}
+                >
+                  <span>[ {msg.model} ]</span>
+                </div>
+              )}
+              {msg.sender === "assistant" && findArtifacts(msg.text) && (
+                <button
+                  onClick={() => setActiveArtifact(findArtifacts(msg.text))}
+                  className="btn-secondary"
+                  style={{
+                    fontSize: "11px",
+                    padding: "4px 8px",
+                    marginBottom: "8px",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    borderRadius: "4px",
+                    border: "1px solid var(--colors-primary)",
+                    color: "var(--colors-primary)",
+                    cursor: "pointer",
+                    marginLeft: msg.model ? "8px" : "0",
+                  }}
+                >
+                  <span>
+                    ⚡{" "}
+                    {findArtifacts(msg.text).type === "html"
+                      ? "Ver Preview HTML"
+                      : "Ver Diagrama"}
+                  </span>
+                </button>
+              )}
+              <div>
+                <MarkdownRenderer content={msg.text} />
               </div>
-            )}
-          </div>
-        ))}
-        {isLoading && (
-          <div className="message-bubble assistant">
-            <div className="thinking-block">
-              <div className="thinking-header">
-                <Brain size={14} strokeWidth={1.75} />
-                <span>
-                  {t.reasoningIn}{" "}
-                  {agentMode === "plan" ? t.planMode : t.buildMode}...
-                </span>
+              {msg.actions && msg.actions.length > 0 && (
+                <div
+                  style={{
+                    marginTop: "14px",
+                    display: "flex",
+                    gap: "10px",
+                    flexWrap: "wrap",
+                  }}
+                >
+                  {msg.actions.map((action, ai) => (
+                    <button
+                      className="btn-secondary"
+                      onClick={() => {
+                        action.type === "edit"
+                          ? setProposedEdit(action.edit)
+                          : action.type === "command" &&
+                            setProposedCommand(action.command);
+                      }}
+                      style={{ fontSize: "12px", padding: "6px 12px" }}
+                      key={ai}
+                    >
+                      {action.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+          {isLoading && (
+            <div className="message-bubble assistant">
+              <div className="thinking-block">
+                <div className="thinking-header">
+                  <Brain size={14} strokeWidth={1.75} />
+                  <span>
+                    {t.reasoningIn}{" "}
+                    {agentMode === "plan" ? t.planMode : t.buildMode}...
+                  </span>
+                </div>
               </div>
             </div>
-          </div>
-        )}
-      </div>
-
-      {suggestCompact && !isLoading && (
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: "12px",
-            margin: "0 16px 10px",
-            padding: "10px 14px",
-            background: "var(--colors-surface-dark-elevated)",
-            border: "1px solid var(--colors-hairline-strong)",
-            borderRadius: "8px",
-            fontFamily: "var(--font-mono)",
-            fontSize: "12px",
-            color: "var(--colors-ink)",
-          }}
-        >
-          <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <Minimize2 size={14} strokeWidth={1.75} />
-            <span>
-              {t.compactSuggest} ({estTokens.toLocaleString()} tokens)
-            </span>
-          </span>
-          <button
-            onClick={() => onCompactChat && onCompactChat(activeChatId)}
-            className="btn-secondary"
-            style={{
-              fontSize: "11px",
-              padding: "6px 12px",
-              borderRadius: "6px",
-              whiteSpace: "nowrap",
-            }}
-          >
-            {t.compactAction}
-          </button>
+          )}
         </div>
-      )}
 
-      {escalation && escalation.low && (
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: "12px",
-            margin: "0 16px 10px",
-            padding: "10px 14px",
-            background: "var(--colors-surface-dark-elevated)",
-            border: "1px solid var(--colors-hairline-strong)",
-            borderRadius: "8px",
-            fontFamily: "var(--font-mono)",
-            fontSize: "12px",
-            color: "var(--colors-ink)",
-          }}
-        >
-          <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <Cpu size={14} strokeWidth={1.75} />
-            <span>{escalation.reason || t.escalateBanner}</span>
-          </span>
-          <button
-            onClick={escalateToCloud}
-            className="btn-secondary"
-            style={{
-              fontSize: "11px",
-              padding: "6px 12px",
-              borderRadius: "6px",
-              whiteSpace: "nowrap",
-            }}
-          >
-            {t.escalateAction}
-          </button>
-        </div>
-      )}
-
-      <div className="chat-input-container">
-        <div className="chat-input-card" style={{ position: "relative" }}>
-          <VoiceDictation voice={voice} />
+        {suggestCompact && !isLoading && (
           <div
             style={{
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
-              paddingBottom: "12px",
-              borderBottom: "1px solid var(--colors-hairline)",
-              gap: "10px",
-              flexWrap: "wrap",
+              gap: "12px",
+              margin: "0 16px 10px",
+              padding: "10px 14px",
+              background: "var(--colors-surface-dark-elevated)",
+              border: "1px solid var(--colors-hairline-strong)",
+              borderRadius: "8px",
+              fontFamily: "var(--font-mono)",
+              fontSize: "12px",
+              color: "var(--colors-ink)",
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-              <button
-                onClick={onOpenModelSelector}
-                className="btn-secondary"
-                style={{
-                  fontSize: "12px",
-                  padding: "6px 12px",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "6px",
-                }}
-              >
-                {selectedModel || t.noModel} <ChevronDown size={14} />
-              </button>
-              <span
-                className={isLocal ? "badge-offline" : "badge-cloud"}
-                style={{ display: "flex", alignItems: "center", gap: "4px" }}
-              >
-                <Cpu size={12} strokeWidth={1.75} />
-                <span>{isLocal ? "Offline" : "Cloud"}</span>
+            <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <Minimize2 size={14} strokeWidth={1.75} />
+              <span>
+                {t.compactSuggest} ({estTokens.toLocaleString()} tokens)
               </span>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-              <button
-                onClick={() => onForkChat && onForkChat(activeChatId)}
-                disabled={!activeChatId}
-                className="btn-secondary"
-                style={{
-                  fontSize: "11px",
-                  padding: "5px 10px",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "5px",
-                }}
-                title={t.forkAction}
-              >
-                <GitBranch size={13} strokeWidth={1.75} /> {t.forkAction}
-              </button>
-              <button
-                onClick={() => onCompactChat && onCompactChat(activeChatId)}
-                disabled={!activeChatId}
-                className="btn-secondary"
-                style={{
-                  fontSize: "11px",
-                  padding: "5px 10px",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "5px",
-                }}
-                title={t.compactAction}
-              >
-                <Minimize2 size={13} strokeWidth={1.75} /> {t.compactAction}
-              </button>
-              <button
-                onClick={onOpenProviderManager}
-                className="btn-secondary"
-                style={{
-                  fontSize: "11px",
-                  padding: "5px 10px",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "5px",
-                }}
-                title="Gestionar proveedores"
-              >
-                <Settings2 size={13} strokeWidth={1.75} /> Proveedores
-              </button>
-            </div>
-          </div>
-
-          {atDropdownOpen && filteredFiles.length > 0 && (
-            <div
+            </span>
+            <button
+              onClick={() => onCompactChat && onCompactChat(activeChatId)}
+              className="btn-secondary"
               style={{
-                position: "absolute",
-                bottom: "calc(100% - 10px)",
-                left: "16px",
-                right: "16px",
-                background: "var(--colors-surface-dark)",
-                border: "1px solid var(--colors-hairline)",
-                borderRadius: "8px",
-                boxShadow: "0 -4px 16px rgba(0,0,0,0.3)",
-                zIndex: 50,
-                maxHeight: "180px",
-                overflowY: "auto",
-                padding: "6px",
+                fontSize: "11px",
+                padding: "6px 12px",
+                borderRadius: "6px",
+                whiteSpace: "nowrap",
               }}
             >
-              {filteredFiles.map((f, fi) => (
-                <div
-                  onClick={() => handleSelectFile(f.name)}
-                  key={f.name}
-                  style={{
-                    padding: "8px 12px",
-                    borderRadius: "4px",
-                    fontFamily: "var(--font-mono)",
-                    fontSize: "12.5px",
-                    cursor: "pointer",
-                    color:
-                      fi === atSelectedIndex
-                        ? "var(--colors-on-primary)"
-                        : "var(--colors-body-strong)",
-                    background:
-                      fi === atSelectedIndex
-                        ? "var(--colors-primary)"
-                        : "transparent",
-                  }}
-                >
-                  {f.name}
-                </div>
-              ))}
-            </div>
-          )}
+              {t.compactAction}
+            </button>
+          </div>
+        )}
 
-          <textarea
-            id="chat-textarea-element"
-            className="chat-textarea"
-            placeholder={
-              agentMode === "plan"
-                ? lang === "es"
-                  ? "¿Qué quieres diseñar o analizar hoy? Escribe una consulta o instrucción..."
-                  : "What do you want to design or analyze today? Type a query or instruction..."
-                : lang === "es"
-                  ? "Describe la modificación de código para editar a disco en Stark..."
-                  : "Describe the code modification to write to disk in Stark..."
-            }
-            value={input}
-            onInput={handleInputChange}
-            onKeyDown={handleKeyDown}
-            rows={3}
-          />
-
+        {escalation && escalation.low && (
           <div
-            className="chat-input-toolbar"
             style={{
               display: "flex",
+              alignItems: "center",
               justifyContent: "space-between",
-              alignItems: "flex-end",
-              paddingTop: "8px",
+              gap: "12px",
+              margin: "0 16px 10px",
+              padding: "10px 14px",
+              background: "var(--colors-surface-dark-elevated)",
+              border: "1px solid var(--colors-hairline-strong)",
+              borderRadius: "8px",
+              fontFamily: "var(--font-mono)",
+              fontSize: "12px",
+              color: "var(--colors-ink)",
             }}
           >
+            <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <Cpu size={14} strokeWidth={1.75} />
+              <span>{escalation.reason || t.escalateBanner}</span>
+            </span>
+            <button
+              onClick={escalateToCloud}
+              className="btn-secondary"
+              style={{
+                fontSize: "11px",
+                padding: "6px 12px",
+                borderRadius: "6px",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {t.escalateAction}
+            </button>
+          </div>
+        )}
+
+        <div className="chat-input-container">
+          <div className="chat-input-card" style={{ position: "relative" }}>
+            <VoiceDictation voice={voice} />
             <div
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: "8px",
+                justifyContent: "space-between",
+                paddingBottom: "12px",
+                borderBottom: "1px solid var(--colors-hairline)",
+                gap: "10px",
                 flexWrap: "wrap",
               }}
             >
               <div
-                ref={dropupRef}
-                style={{ position: "relative" }}
-                onMouseLeave={() => setIsDropupOpen(false)}
+                style={{ display: "flex", alignItems: "center", gap: "10px" }}
               >
                 <button
-                  onClick={() => setIsDropupOpen(!isDropupOpen)}
+                  onClick={onOpenModelSelector}
+                  className="btn-secondary"
+                  style={{
+                    fontSize: "12px",
+                    padding: "6px 12px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                  }}
+                >
+                  {selectedModel || t.noModel} <ChevronDown size={14} />
+                </button>
+                <span
+                  className={isLocal ? "badge-offline" : "badge-cloud"}
+                  style={{ display: "flex", alignItems: "center", gap: "4px" }}
+                >
+                  <Cpu size={12} strokeWidth={1.75} />
+                  <span>{isLocal ? "Offline" : "Cloud"}</span>
+                </span>
+              </div>
+              <div
+                style={{ display: "flex", alignItems: "center", gap: "6px" }}
+              >
+                <button
+                  onClick={() => onForkChat && onForkChat(activeChatId)}
+                  disabled={!activeChatId}
+                  className="btn-secondary"
+                  style={{
+                    fontSize: "11px",
+                    padding: "5px 10px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "5px",
+                  }}
+                  title={t.forkAction}
+                >
+                  <GitBranch size={13} strokeWidth={1.75} /> {t.forkAction}
+                </button>
+                <button
+                  onClick={() => onCompactChat && onCompactChat(activeChatId)}
+                  disabled={!activeChatId}
+                  className="btn-secondary"
+                  style={{
+                    fontSize: "11px",
+                    padding: "5px 10px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "5px",
+                  }}
+                  title={t.compactAction}
+                >
+                  <Minimize2 size={13} strokeWidth={1.75} /> {t.compactAction}
+                </button>
+                <button
+                  onClick={onOpenProviderManager}
+                  className="btn-secondary"
+                  style={{
+                    fontSize: "11px",
+                    padding: "5px 10px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "5px",
+                  }}
+                  title="Gestionar proveedores"
+                >
+                  <Settings2 size={13} strokeWidth={1.75} /> Proveedores
+                </button>
+              </div>
+            </div>
+
+            {atDropdownOpen && filteredFiles.length > 0 && (
+              <div
+                style={{
+                  position: "absolute",
+                  bottom: "calc(100% - 10px)",
+                  left: "16px",
+                  right: "16px",
+                  background: "var(--colors-surface-dark)",
+                  border: "1px solid var(--colors-hairline)",
+                  borderRadius: "8px",
+                  boxShadow: "0 -4px 16px rgba(0,0,0,0.3)",
+                  zIndex: 50,
+                  maxHeight: "180px",
+                  overflowY: "auto",
+                  padding: "6px",
+                }}
+              >
+                {filteredFiles.map((f, fi) => (
+                  <div
+                    onClick={() => handleSelectFile(f.name)}
+                    key={f.name}
+                    style={{
+                      padding: "8px 12px",
+                      borderRadius: "4px",
+                      fontFamily: "var(--font-mono)",
+                      fontSize: "12.5px",
+                      cursor: "pointer",
+                      color:
+                        fi === atSelectedIndex
+                          ? "var(--colors-on-primary)"
+                          : "var(--colors-body-strong)",
+                      background:
+                        fi === atSelectedIndex
+                          ? "var(--colors-primary)"
+                          : "transparent",
+                    }}
+                  >
+                    {f.name}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <textarea
+              id="chat-textarea-element"
+              className="chat-textarea"
+              placeholder={
+                agentMode === "plan"
+                  ? lang === "es"
+                    ? "¿Qué quieres diseñar o analizar hoy? Escribe una consulta o instrucción..."
+                    : "What do you want to design or analyze today? Type a query or instruction..."
+                  : lang === "es"
+                    ? "Describe la modificación de código para editar a disco en Stark..."
+                    : "Describe the code modification to write to disk in Stark..."
+              }
+              value={input}
+              onInput={handleInputChange}
+              onKeyDown={handleKeyDown}
+              rows={3}
+            />
+
+            <div
+              className="chat-input-toolbar"
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-end",
+                paddingTop: "8px",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  flexWrap: "wrap",
+                }}
+              >
+                <div
+                  ref={dropupRef}
+                  style={{ position: "relative" }}
+                  onMouseLeave={() => setIsDropupOpen(false)}
+                >
+                  <button
+                    onClick={() => setIsDropupOpen(!isDropupOpen)}
+                    style={{
+                      width: "32px",
+                      height: "32px",
+                      borderRadius: "50%",
+                      background: "var(--colors-surface-dark-elevated)",
+                      border: "1px solid var(--colors-hairline)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      cursor: "pointer",
+                      color: "var(--colors-ink)",
+                    }}
+                  >
+                    <Plus size={16} strokeWidth={1.75} />
+                  </button>
+                  <input
+                    type="file"
+                    multiple
+                    ref={fileInputRef}
+                    style={{ display: "none" }}
+                    onChange={handleFileUpload}
+                    accept=".txt,.pdf,.log,.md,.js,.ts,.rs,.png,.jpg,.jpeg"
+                  />
+                  {isDropupOpen && (
+                    <div
+                      style={{
+                        position: "absolute",
+                        bottom: "calc(100% + 6px)",
+                        left: 0,
+                        background: "var(--colors-surface-dark-elevated)",
+                        border: "1px solid var(--colors-hairline)",
+                        borderRadius: "8px",
+                        padding: "6px",
+                        minWidth: "180px",
+                        zIndex: 10,
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "4px",
+                        boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                      }}
+                    >
+                      <button
+                        onClick={handlePickAttachment}
+                        style={{
+                          background: "transparent",
+                          border: "none",
+                          padding: "6px 8px",
+                          textAlign: "left",
+                          cursor: "pointer",
+                          color: "var(--colors-ink)",
+                          fontSize: "12px",
+                          borderRadius: "4px",
+                          display: "flex",
+                          alignItems: "center",
+                        }}
+                      >
+                        <Paperclip size={13} style={{ marginRight: "6px" }} />{" "}
+                        {lang === "es" ? "Adjuntar files" : "Attach files"}
+                      </button>
+
+                      <div
+                        style={{
+                          fontSize: "11px",
+                          color: "var(--colors-muted)",
+                          padding: "4px 8px",
+                          marginTop: "4px",
+                          borderTop: "1px solid var(--colors-hairline)",
+                        }}
+                      >
+                        {lang === "es" ? "Agentes" : "Agents"}
+                      </div>
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "2px",
+                        }}
+                      >
+                        {[
+                          {
+                            id: "research",
+                            name: "Research Agent",
+                            tag: "@research",
+                          },
+                          { id: "coder", name: "Coder Agent", tag: "@coder" },
+                          {
+                            id: "planner",
+                            name: "Planner Agent",
+                            tag: "@planner",
+                          },
+                          ...customAgents,
+                        ].map((agent) => (
+                          <button
+                            key={agent.id}
+                            onClick={() => {
+                              setInput((prev) =>
+                                prev ? `${prev} ${agent.tag} ` : `${agent.tag} `
+                              );
+                              setIsDropupOpen(false);
+                            }}
+                            style={{
+                              background: "transparent",
+                              border: "none",
+                              padding: "6px 8px",
+                              textAlign: "left",
+                              cursor: "pointer",
+                              color: "var(--colors-ink)",
+                              fontSize: "12px",
+                              borderRadius: "4px",
+                            }}
+                          >
+                            {agent.name}
+                          </button>
+                        ))}
+                      </div>
+
+                      <div
+                        style={{
+                          fontSize: "11px",
+                          color: "var(--colors-muted)",
+                          padding: "4px 8px",
+                          marginTop: "4px",
+                          borderTop: "1px solid var(--colors-hairline)",
+                        }}
+                      >
+                        {lang === "es"
+                          ? "Skills - librería de skills"
+                          : "Skills - skills library"}
+                      </div>
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "2px",
+                          maxHeight: "120px",
+                          overflowY: "auto",
+                        }}
+                      >
+                        {availableSkills.map((s) => (
+                          <button
+                            onClick={() => {
+                              setSelectedSkill(s);
+                              setIsDropupOpen(false);
+                            }}
+                            key={s.name}
+                            style={{
+                              background: "transparent",
+                              border: "none",
+                              padding: "6px 8px",
+                              textAlign: "left",
+                              cursor: "pointer",
+                              color: "var(--colors-ink)",
+                              fontSize: "12px",
+                              borderRadius: "4px",
+                            }}
+                          >
+                            /{s.name}
+                          </button>
+                        ))}
+                      </div>
+
+                      <CreateRow
+                        lang={lang}
+                        onCreate={(kind) => {
+                          setCreateType(kind);
+                          setIsDropupOpen(false);
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <div className="mode-toggle-group" style={{ margin: 0 }}>
+                  <button
+                    className={`btn-mode-toggle ${agentMode === "plan" ? "active" : ""}`}
+                    onClick={() => setAgentMode("plan")}
+                  >
+                    {t.planMode}
+                  </button>
+                  <button
+                    className={`btn-mode-toggle ${agentMode === "build" ? "active" : ""}`}
+                    onClick={() => setAgentMode("build")}
+                  >
+                    {t.buildMode}
+                  </button>
+                </div>
+
+                <button
+                  onClick={() => setReasoning(!reasoning)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    fontSize: "12px",
+                    padding: "4px 8px",
+                    borderRadius: "16px",
+                    background: reasoning
+                      ? "var(--colors-surface-dark-elevated)"
+                      : "transparent",
+                    border: reasoning
+                      ? "1px solid var(--colors-hairline-strong)"
+                      : "1px solid transparent",
+                    color: reasoning
+                      ? "var(--colors-ink)"
+                      : "var(--colors-muted)",
+                    cursor: "pointer",
+                    fontFamily: "var(--font-mono)",
+                  }}
+                >
+                  <Brain size={14} strokeWidth={1.75} /> CoT
+                </button>
+
+                <button
+                  onClick={toggleAutoEscalate}
+                  title={t.autoEscalateToggle}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    fontSize: "12px",
+                    padding: "4px 8px",
+                    borderRadius: "16px",
+                    background: autoEscalate
+                      ? "var(--colors-surface-dark-elevated)"
+                      : "transparent",
+                    border: autoEscalate
+                      ? "1px solid var(--colors-hairline-strong)"
+                      : "1px solid transparent",
+                    color: autoEscalate
+                      ? "var(--colors-ink)"
+                      : "var(--colors-muted)",
+                    cursor: "pointer",
+                    fontFamily: "var(--font-mono)",
+                  }}
+                >
+                  <Settings size={14} strokeWidth={1.75} />{" "}
+                  {t.autoEscalateLabel}
+                </button>
+
+                {selectedSkill && (
+                  <span
+                    style={{
+                      fontSize: "11.5px",
+                      fontFamily: "var(--font-mono)",
+                      background: "var(--colors-surface-dark-elevated)",
+                      color: "var(--colors-ink-deep)",
+                      padding: "4px 10px",
+                      borderRadius: "16px",
+                      border: "1px solid var(--colors-hairline-strong)",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                    }}
+                  >
+                    <Zap size={12} strokeWidth={1.75} />
+                    <span>/{selectedSkill.name}</span>
+                    <button
+                      onClick={() => setSelectedSkill(null)}
+                      style={{
+                        background: "transparent",
+                        border: "none",
+                        color: "var(--colors-muted)",
+                        cursor: "pointer",
+                        display: "flex",
+                      }}
+                    >
+                      <X size={12} />
+                    </button>
+                  </span>
+                )}
+
+                {attachments.map((att, ai) => (
+                  <span
+                    key={ai}
+                    style={{
+                      fontSize: "11.5px",
+                      fontFamily: "var(--font-mono)",
+                      background: "var(--colors-surface-dark-elevated)",
+                      color: "var(--colors-ink)",
+                      padding: "4px 10px",
+                      borderRadius: "16px",
+                      border: "1px solid var(--colors-hairline)",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                    }}
+                  >
+                    <span>Doc: {att.name}</span>
+                    <button
+                      onClick={() =>
+                        setAttachments((prev) =>
+                          prev.filter((_, idx) => idx !== ai)
+                        )
+                      }
+                      style={{
+                        background: "transparent",
+                        border: "none",
+                        color: "var(--colors-muted)",
+                        cursor: "pointer",
+                        display: "flex",
+                      }}
+                    >
+                      <X size={12} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+
+              <div
+                style={{ display: "flex", alignItems: "center", gap: "8px" }}
+              >
+                <span
+                  style={{
+                    fontSize: "10.5px",
+                    fontFamily: "var(--font-mono)",
+                    color: "var(--colors-muted)",
+                  }}
+                >
+                  Tokens: {tokensUsed}
+                </span>
+                <button
+                  onClick={handleMicClick}
                   style={{
                     width: "32px",
                     height: "32px",
                     borderRadius: "50%",
-                    background: "var(--colors-surface-dark-elevated)",
+                    background:
+                      voice.status === "recording" ||
+                      voice.status === "transcribing"
+                        ? "var(--colors-primary, #ffffff)"
+                        : "transparent",
                     border: "1px solid var(--colors-hairline)",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
+                    cursor:
+                      voice.status === "transcribing" ? "wait" : "pointer",
+                    color:
+                      voice.status === "recording" ||
+                      voice.status === "transcribing"
+                        ? "var(--colors-canvas, #1e1e1e)"
+                        : "var(--colors-ink)",
+                  }}
+                  title={
+                    voice.status === "recording"
+                      ? "Detener e insertar transcripcion"
+                      : voice.status === "transcribing"
+                        ? "Transcribiendo..."
+                        : "Dictar por voz - se inserta en el prompt"
+                  }
+                >
+                  <Mic size={16} strokeWidth={1.75} />
+                </button>
+                <button
+                  onClick={isLoading ? handleStop : handleSend}
+                  style={{
+                    width: "32px",
+                    height: "32px",
+                    borderRadius: "50%",
+                    background: "var(--colors-primary, #ffffff)",
+                    border: "none",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
                     cursor: "pointer",
-                    color: "var(--colors-ink)",
+                    color: "var(--colors-canvas, #1e1e1e)",
                   }}
                 >
-                  <Plus size={16} strokeWidth={1.75} />
-                </button>
-                <input
-                  type="file"
-                  multiple
-                  ref={fileInputRef}
-                  style={{ display: "none" }}
-                  onChange={handleFileUpload}
-                  accept=".txt,.pdf,.log,.md,.js,.ts,.rs,.png,.jpg,.jpeg"
-                />
-                {isDropupOpen && (
-                  <div
-                    style={{
-                      position: "absolute",
-                      bottom: "calc(100% + 6px)",
-                      left: 0,
-                      background: "var(--colors-surface-dark-elevated)",
-                      border: "1px solid var(--colors-hairline)",
-                      borderRadius: "8px",
-                      padding: "6px",
-                      minWidth: "180px",
-                      zIndex: 10,
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "4px",
-                      boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-                    }}
-                  >
-                    <button
-                      onClick={handlePickAttachment}
-                      style={{
-                        background: "transparent",
-                        border: "none",
-                        padding: "6px 8px",
-                        textAlign: "left",
-                        cursor: "pointer",
-                        color: "var(--colors-ink)",
-                        fontSize: "12px",
-                        borderRadius: "4px",
-                        display: "flex",
-                        alignItems: "center",
-                      }}
-                    >
-                      <Paperclip size={13} style={{ marginRight: "6px" }} />{" "}
-                      {lang === "es" ? "Adjuntar files" : "Attach files"}
-                    </button>
-
-                    <div
-                      style={{
-                        fontSize: "11px",
-                        color: "var(--colors-muted)",
-                        padding: "4px 8px",
-                        marginTop: "4px",
-                        borderTop: "1px solid var(--colors-hairline)",
-                      }}
-                    >
-                      {lang === "es" ? "Agentes" : "Agents"}
-                    </div>
-                    <div
-                      style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: "2px",
-                      }}
-                    >
-                      {[
-                        {
-                          id: "research",
-                          name: "Research Agent",
-                          tag: "@research",
-                        },
-                        { id: "coder", name: "Coder Agent", tag: "@coder" },
-                        {
-                          id: "planner",
-                          name: "Planner Agent",
-                          tag: "@planner",
-                        },
-                        ...customAgents,
-                      ].map((agent) => (
-                        <button
-                          key={agent.id}
-                          onClick={() => {
-                            setInput((prev) =>
-                              prev ? `${prev} ${agent.tag} ` : `${agent.tag} `
-                            );
-                            setIsDropupOpen(false);
-                          }}
-                          style={{
-                            background: "transparent",
-                            border: "none",
-                            padding: "6px 8px",
-                            textAlign: "left",
-                            cursor: "pointer",
-                            color: "var(--colors-ink)",
-                            fontSize: "12px",
-                            borderRadius: "4px",
-                          }}
-                        >
-                          {agent.name}
-                        </button>
-                      ))}
-                    </div>
-
-                    <div
-                      style={{
-                        fontSize: "11px",
-                        color: "var(--colors-muted)",
-                        padding: "4px 8px",
-                        marginTop: "4px",
-                        borderTop: "1px solid var(--colors-hairline)",
-                      }}
-                    >
-                      {lang === "es"
-                        ? "Skills - librería de skills"
-                        : "Skills - skills library"}
-                    </div>
-                    <div
-                      style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: "2px",
-                        maxHeight: "120px",
-                        overflowY: "auto",
-                      }}
-                    >
-                      {availableSkills.map((s) => (
-                        <button
-                          onClick={() => {
-                            setSelectedSkill(s);
-                            setIsDropupOpen(false);
-                          }}
-                          key={s.name}
-                          style={{
-                            background: "transparent",
-                            border: "none",
-                            padding: "6px 8px",
-                            textAlign: "left",
-                            cursor: "pointer",
-                            color: "var(--colors-ink)",
-                            fontSize: "12px",
-                            borderRadius: "4px",
-                          }}
-                        >
-                          /{s.name}
-                        </button>
-                      ))}
-                    </div>
-
-                    <CreateRow
-                      lang={lang}
-                      onCreate={(kind) => {
-                        setCreateType(kind);
-                        setIsDropupOpen(false);
-                      }}
-                    />
-                  </div>
-                )}
-              </div>
-
-              <div className="mode-toggle-group" style={{ margin: 0 }}>
-                <button
-                  className={`btn-mode-toggle ${agentMode === "plan" ? "active" : ""}`}
-                  onClick={() => setAgentMode("plan")}
-                >
-                  {t.planMode}
-                </button>
-                <button
-                  className={`btn-mode-toggle ${agentMode === "build" ? "active" : ""}`}
-                  onClick={() => setAgentMode("build")}
-                >
-                  {t.buildMode}
+                  {isLoading ? (
+                    <X size={16} strokeWidth={1.75} />
+                  ) : (
+                    <ArrowUp size={16} strokeWidth={1.75} />
+                  )}
                 </button>
               </div>
-
-              <button
-                onClick={() => setReasoning(!reasoning)}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  fontSize: "12px",
-                  padding: "4px 8px",
-                  borderRadius: "16px",
-                  background: reasoning
-                    ? "var(--colors-surface-dark-elevated)"
-                    : "transparent",
-                  border: reasoning
-                    ? "1px solid var(--colors-hairline-strong)"
-                    : "1px solid transparent",
-                  color: reasoning
-                    ? "var(--colors-ink)"
-                    : "var(--colors-muted)",
-                  cursor: "pointer",
-                  fontFamily: "var(--font-mono)",
-                }}
-              >
-                <Brain size={14} strokeWidth={1.75} /> CoT
-              </button>
-
-              <button
-                onClick={toggleAutoEscalate}
-                title={t.autoEscalateToggle}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  fontSize: "12px",
-                  padding: "4px 8px",
-                  borderRadius: "16px",
-                  background: autoEscalate
-                    ? "var(--colors-surface-dark-elevated)"
-                    : "transparent",
-                  border: autoEscalate
-                    ? "1px solid var(--colors-hairline-strong)"
-                    : "1px solid transparent",
-                  color: autoEscalate
-                    ? "var(--colors-ink)"
-                    : "var(--colors-muted)",
-                  cursor: "pointer",
-                  fontFamily: "var(--font-mono)",
-                }}
-              >
-                <Settings size={14} strokeWidth={1.75} /> {t.autoEscalateLabel}
-              </button>
-
-              {selectedSkill && (
-                <span
-                  style={{
-                    fontSize: "11.5px",
-                    fontFamily: "var(--font-mono)",
-                    background: "var(--colors-surface-dark-elevated)",
-                    color: "var(--colors-ink-deep)",
-                    padding: "4px 10px",
-                    borderRadius: "16px",
-                    border: "1px solid var(--colors-hairline-strong)",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "6px",
-                  }}
-                >
-                  <Zap size={12} strokeWidth={1.75} />
-                  <span>/{selectedSkill.name}</span>
-                  <button
-                    onClick={() => setSelectedSkill(null)}
-                    style={{
-                      background: "transparent",
-                      border: "none",
-                      color: "var(--colors-muted)",
-                      cursor: "pointer",
-                      display: "flex",
-                    }}
-                  >
-                    <X size={12} />
-                  </button>
-                </span>
-              )}
-
-              {attachments.map((att, ai) => (
-                <span
-                  key={ai}
-                  style={{
-                    fontSize: "11.5px",
-                    fontFamily: "var(--font-mono)",
-                    background: "var(--colors-surface-dark-elevated)",
-                    color: "var(--colors-ink)",
-                    padding: "4px 10px",
-                    borderRadius: "16px",
-                    border: "1px solid var(--colors-hairline)",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "6px",
-                  }}
-                >
-                  <span>Doc: {att.name}</span>
-                  <button
-                    onClick={() =>
-                      setAttachments((prev) =>
-                        prev.filter((_, idx) => idx !== ai)
-                      )
-                    }
-                    style={{
-                      background: "transparent",
-                      border: "none",
-                      color: "var(--colors-muted)",
-                      cursor: "pointer",
-                      display: "flex",
-                    }}
-                  >
-                    <X size={12} />
-                  </button>
-                </span>
-              ))}
-            </div>
-
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <span
-                style={{
-                  fontSize: "10.5px",
-                  fontFamily: "var(--font-mono)",
-                  color: "var(--colors-muted)",
-                }}
-              >
-                Tokens: {tokensUsed}
-              </span>
-              <button
-                onClick={handleMicClick}
-                style={{
-                  width: "32px",
-                  height: "32px",
-                  borderRadius: "50%",
-                  background:
-                    voice.status === "recording" ||
-                    voice.status === "transcribing"
-                      ? "var(--colors-primary, #ffffff)"
-                      : "transparent",
-                  border: "1px solid var(--colors-hairline)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  cursor: voice.status === "transcribing" ? "wait" : "pointer",
-                  color:
-                    voice.status === "recording" ||
-                    voice.status === "transcribing"
-                      ? "var(--colors-canvas, #1e1e1e)"
-                      : "var(--colors-ink)",
-                }}
-                title={
-                  voice.status === "recording"
-                    ? "Detener e insertar transcripcion"
-                    : voice.status === "transcribing"
-                      ? "Transcribiendo..."
-                      : "Dictar por voz - se inserta en el prompt"
-                }
-              >
-                <Mic size={16} strokeWidth={1.75} />
-              </button>
-              <button
-                onClick={isLoading ? handleStop : handleSend}
-                style={{
-                  width: "32px",
-                  height: "32px",
-                  borderRadius: "50%",
-                  background: "var(--colors-primary, #ffffff)",
-                  border: "none",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  cursor: "pointer",
-                  color: "var(--colors-canvas, #1e1e1e)",
-                }}
-              >
-                {isLoading ? (
-                  <X size={16} strokeWidth={1.75} />
-                ) : (
-                  <ArrowUp size={16} strokeWidth={1.75} />
-                )}
-              </button>
             </div>
           </div>
         </div>
-      </div>
 
-      {input.trim() === "" && (
+        {input.trim() === "" && (
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              justifyContent: "center",
+              gap: "10px",
+              marginTop: "14px",
+            }}
+          >
+            {pluginInjectors.map((p, pi) => {
+              const Icon = p.icon;
+              return (
+                <button
+                  className="suggestion-chip"
+                  onClick={() => handleSuggestion(p.stub)}
+                  key={pi}
+                >
+                  <Icon
+                    size={13}
+                    strokeWidth={1.75}
+                    style={{ color: "var(--colors-muted)" }}
+                  />
+                  <span>{p.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        <CreateAssetModal
+          kind={createType}
+          onClose={() => setCreateType(null)}
+          onCreated={handleAssetCreated}
+          workspacePath={workspacePath}
+        />
+      </div>
+      {activeArtifact && (
         <div
           style={{
+            width: "50%",
             display: "flex",
-            flexWrap: "wrap",
-            justifyContent: "center",
-            gap: "10px",
-            marginTop: "14px",
+            flexDirection: "column",
+            height: "100%",
+            background: "var(--colors-canvas)",
+            minWidth: "320px",
           }}
         >
-          {pluginInjectors.map((p, pi) => {
-            const Icon = p.icon;
-            return (
-              <button
-                className="suggestion-chip"
-                onClick={() => handleSuggestion(p.stub)}
-                key={pi}
+          {/* Artifact Header */}
+          <div
+            style={{
+              padding: "12px 16px",
+              borderBottom: "1px solid var(--colors-hairline)",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            <h3
+              style={{
+                margin: 0,
+                fontSize: "14px",
+                fontFamily: "var(--font-mono)",
+                fontWeight: "700",
+              }}
+            >
+              {activeArtifact.title}
+            </h3>
+            <button
+              onClick={() => setActiveArtifact(null)}
+              style={{
+                background: "transparent",
+                border: "none",
+                color: "var(--colors-muted)",
+                cursor: "pointer",
+                fontSize: "13px",
+              }}
+            >
+              [✕]
+            </button>
+          </div>
+          {/* Artifact Body */}
+          <div
+            style={{
+              flex: 1,
+              overflow: "auto",
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
+            {activeArtifact.type === "html" ? (
+              <iframe
+                srcDoc={activeArtifact.content}
+                sandbox="allow-scripts"
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  border: "none",
+                  background: "#fff",
+                }}
+              />
+            ) : (
+              <pre
+                style={{
+                  padding: "16px",
+                  margin: 0,
+                  overflow: "auto",
+                  fontSize: "12px",
+                  fontFamily: "var(--font-mono)",
+                  background: "var(--colors-surface-dark)",
+                  height: "100%",
+                }}
               >
-                <Icon
-                  size={13}
-                  strokeWidth={1.75}
-                  style={{ color: "var(--colors-muted)" }}
-                />
-                <span>{p.label}</span>
-              </button>
-            );
-          })}
+                <code>{activeArtifact.content}</code>
+              </pre>
+            )}
+          </div>
         </div>
       )}
-
-      <CreateAssetModal
-        kind={createType}
-        onClose={() => setCreateType(null)}
-        onCreated={handleAssetCreated}
-        workspacePath={workspacePath}
-      />
     </div>
   );
 }

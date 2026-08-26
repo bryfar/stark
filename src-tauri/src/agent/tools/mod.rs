@@ -4,6 +4,8 @@ pub mod skills;
 pub mod input;
 pub mod desktop;
 pub mod seams;
+pub mod web_search;
+pub mod browser_use;
 
 use serde_json::Value;
 

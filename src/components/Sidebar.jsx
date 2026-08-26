@@ -42,9 +42,11 @@ export function Sidebar({
   onNewChat,
   onDeleteChat,
   lang = "es",
+  chatMessages = {},
 }) {
   const [isOverlayOpen, setIsOverlayOpen] = useState(false);
   const [isPinned, setIsPinned] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const overlayRef = useRef(null);
 
   const t = translations[lang]
@@ -300,50 +302,95 @@ export function Sidebar({
 
           <div
             className="overlay-section"
-            style={{ flex: 1, overflowY: "auto" }}
+            style={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+            }}
           >
             <div className="section-title">{t.history}</div>
-            {conversations.length === 0 && (
-              <div className="history-item">
-                <Clock size={14} strokeWidth={1.75} />
-                <span>{t.olderChats}</span>
-              </div>
-            )}
-            {conversations.map((c) => (
-              <div
-                key={c.id}
-                className={`history-item ${activeChatId === c.id ? "active" : ""}`}
-                onClick={() => onSelectChat && onSelectChat(c.id)}
+            <div style={{ padding: "0 12px 10px 12px" }}>
+              <input
+                type="text"
+                placeholder={
+                  lang === "es" ? "Buscar chats..." : "Search chats..."
+                }
+                value={searchQuery}
+                onInput={(e) => setSearchQuery(e.target.value)}
                 style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  cursor: "pointer",
+                  width: "100%",
+                  padding: "6px 10px",
+                  fontSize: "12px",
+                  background: "var(--colors-surface-dark-soft)",
+                  border: "1px solid var(--colors-hairline)",
+                  borderRadius: "6px",
+                  color: "var(--colors-ink)",
+                  outline: "none",
                 }}
-              >
-                <MessageSquare size={14} strokeWidth={1.75} />
-                <span
-                  style={{
-                    flex: 1,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {c.title || "Nueva conversación"}
-                </span>
-                <button
-                  className="overlay-icon-btn"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onDeleteChat && onDeleteChat(c.id);
-                  }}
-                  title="Eliminar"
-                >
-                  <X size={13} strokeWidth={1.75} />
-                </button>
-              </div>
-            ))}
+              />
+            </div>
+            <div style={{ flex: 1, overflowY: "auto" }}>
+              {(() => {
+                const filtered = conversations.filter((c) => {
+                  const q = searchQuery.toLowerCase().trim();
+                  if (!q) return true;
+                  const matchesTitle = (c.title || "")
+                    .toLowerCase()
+                    .includes(q);
+                  const msgs = chatMessages[c.id] || [];
+                  const matchesMessage = msgs.some((m) =>
+                    (m.text || "").toLowerCase().includes(q)
+                  );
+                  return matchesTitle || matchesMessage;
+                });
+
+                if (filtered.length === 0) {
+                  return (
+                    <div className="history-item">
+                      <Clock size={14} strokeWidth={1.75} />
+                      <span>{t.olderChats}</span>
+                    </div>
+                  );
+                }
+
+                return filtered.map((c) => (
+                  <div
+                    key={c.id}
+                    className={`history-item ${activeChatId === c.id ? "active" : ""}`}
+                    onClick={() => onSelectChat && onSelectChat(c.id)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <MessageSquare size={14} strokeWidth={1.75} />
+                    <span
+                      style={{
+                        flex: 1,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {c.title || "Nueva conversación"}
+                    </span>
+                    <button
+                      className="overlay-icon-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDeleteChat && onDeleteChat(c.id);
+                      }}
+                      title="Eliminar"
+                    >
+                      <X size={13} strokeWidth={1.75} />
+                    </button>
+                  </div>
+                ));
+              })()}
+            </div>
           </div>
 
           <div

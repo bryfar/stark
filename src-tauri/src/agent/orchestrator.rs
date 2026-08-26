@@ -10,6 +10,8 @@ use crate::eventsink::{EventSink, SharedSink};
 use crate::agent::tools::skills::LoadSkillTool;
 use crate::agent::tools::input::DesktopInputTool;
 use crate::agent::tools::desktop::DesktopControlTool;
+use crate::agent::tools::web_search::WebSearchTool;
+use crate::agent::tools::browser_use::BrowserUseTool;
 use std::sync::Arc;
 
 pub struct AgentRuntime {
@@ -27,6 +29,8 @@ impl AgentRuntime {
         tool_registry.register(Box::new(LoadSkillTool));
         tool_registry.register(Box::new(DesktopInputTool));
         tool_registry.register(Box::new(DesktopControlTool));
+        tool_registry.register(Box::new(WebSearchTool));
+        tool_registry.register(Box::new(BrowserUseTool));
 
         Self {
             sink,

@@ -316,6 +316,7 @@ export function App() {
       messages: (messages || []).map((m) => ({
         role: m.sender,
         content: m.text,
+        model: m.model || null,
       })),
       parent_id: meta.parent_id || null,
       kind: meta.kind || "root",
@@ -336,6 +337,7 @@ export function App() {
               sender: m.role,
               text: m.content,
               isStreaming: false,
+              model: m.model || null,
             }));
             metaMap[c.id] = {
               parent_id: c.parent_id || null,
@@ -991,6 +993,7 @@ export function App() {
             setMode("chat");
           }
         }}
+        chatMessages={chatMessages}
         isMaximized={isMaximized}
         setIsMaximized={setIsMaximized}
         onOpenSettings={() => setIsSettingsOpen(true)}
@@ -1016,7 +1019,9 @@ export function App() {
         {activePage === "integrations" && <IntegrationsPage />}
         {activePage === "projects" && <ProjectsPage lang={lang} />}
         {activePage === "usage" && <UsagePage />}
-        {activePage === "skills" && <SkillsPage />}
+        {activePage === "skills" && (
+          <SkillsPage workspacePath={workspacePath} />
+        )}
 
         {/* Workspace modes — only shown when no global page is active */}
         {(!activePage || activePage === "home") && currentMode === "chat" && (
