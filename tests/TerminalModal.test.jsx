@@ -46,7 +46,7 @@ describe("TerminalModal (sandbox approval & live streaming)", () => {
     await new Promise((r) => setTimeout(r, 20));
 
     expect(screen.getByText("[Cerrar]")).not.toBeNull();
-    expect(handleApprove).toHaveBeenCalledWith("echo hi", true);
+    expect(handleApprove).toHaveBeenCalledWith("echo hi", true, false);
   });
 
   it("calls onReject when cancel is clicked", () => {

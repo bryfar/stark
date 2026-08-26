@@ -300,3 +300,252 @@ pub async fn transcribe(
         Err(format!("Whisper fallo: {}", stderr))
     }
 }
+
+use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+
+pub struct SendStream(pub cpal::Stream);
+unsafe impl Send for SendStream {}
+unsafe impl Sync for SendStream {}
+
+pub struct VoiceState {
+    pub stream: Option<SendStream>,
+    pub is_listening: bool,
+}
+
+static VOICE_STATE: std::sync::OnceLock<std::sync::Mutex<VoiceState>> = std::sync::OnceLock::new();
+
+fn get_voice_state() -> &'static std::sync::Mutex<VoiceState> {
+    VOICE_STATE.get_or_init(|| {
+        std::sync::Mutex::new(VoiceState {
+            stream: None,
+            is_listening: false,
+        })
+    })
+}
+
+
+fn write_wav_file(path: &Path, samples: &[i16], sample_rate: u32) -> Result<(), String> {
+    use std::fs::File;
+    use std::io::Write;
+
+    let mut file = File::create(path).map_err(|e| format!("No se pudo crear archivo WAV: {}", e))?;
+
+    let num_channels = 1u16;
+    let bits_per_sample = 16u16;
+    let byte_rate = sample_rate * num_channels as u32 * (bits_per_sample as u32 / 8);
+    let block_align = num_channels * (bits_per_sample / 8);
+    let subchunk2_size = samples.len() as u32 * 2;
+    let chunk_size = 36 + subchunk2_size;
+
+    file.write_all(b"RIFF").map_err(|e| e.to_string())?;
+    file.write_all(&chunk_size.to_le_bytes()).map_err(|e| e.to_string())?;
+    file.write_all(b"WAVE").map_err(|e| e.to_string())?;
+
+    file.write_all(b"fmt ").map_err(|e| e.to_string())?;
+    file.write_all(&16u32.to_le_bytes()).map_err(|e| e.to_string())?;
+    file.write_all(&1u16.to_le_bytes()).map_err(|e| e.to_string())?;
+    file.write_all(&num_channels.to_le_bytes()).map_err(|e| e.to_string())?;
+    file.write_all(&sample_rate.to_le_bytes()).map_err(|e| e.to_string())?;
+    file.write_all(&byte_rate.to_le_bytes()).map_err(|e| e.to_string())?;
+    file.write_all(&block_align.to_le_bytes()).map_err(|e| e.to_string())?;
+    file.write_all(&bits_per_sample.to_le_bytes()).map_err(|e| e.to_string())?;
+
+    file.write_all(b"data").map_err(|e| e.to_string())?;
+    file.write_all(&subchunk2_size.to_le_bytes()).map_err(|e| e.to_string())?;
+
+    for &sample in samples {
+        file.write_all(&sample.to_le_bytes()).map_err(|e| e.to_string())?;
+    }
+
+    Ok(())
+}
+
+async fn process_and_transcribe(samples: Vec<f32>, app: AppHandle) -> Result<(), String> {
+    let pcm_samples: Vec<i16> = samples
+        .iter()
+        .map(|&x| {
+            let clamped = x.clamp(-1.0, 1.0);
+            if clamped < 0.0 {
+                (clamped * 32768.0) as i16
+            } else {
+                (clamped * 32767.0) as i16
+            }
+        })
+        .collect();
+
+    let temp_dir = std::env::temp_dir();
+    let r: u32 = rand::random();
+    let wav_path = temp_dir.join(format!("stark_continuous_{}_{}.wav", std::process::id(), r));
+
+    write_wav_file(&wav_path, &pcm_samples, 16000)?;
+
+    let status = current_status();
+    let binary = status.whisper_binary.ok_or_else(|| "Binario de Whisper no disponible".to_string())?;
+    let model = status.whisper_model.ok_or_else(|| "Modelo de Whisper no disponible".to_string())?;
+
+    let text = transcribe(&wav_path, Path::new(&binary), Path::new(&model)).await?;
+
+    let _ = fs::remove_file(&wav_path);
+
+    if !text.trim().is_empty() {
+        println!("[VAD] Transcripción: {}", text);
+        let _ = app.emit("voice-speech-processed", text);
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn start_continuous_listening(app: AppHandle) -> Result<(), String> {
+    let mut state = get_voice_state().lock().unwrap();
+    if state.is_listening {
+        return Ok(());
+    }
+
+    let host = cpal::default_host();
+    let device = host
+        .default_input_device()
+        .ok_or_else(|| "No se encontró ningún dispositivo de entrada de audio".to_string())?;
+
+    let config = device
+        .default_input_config()
+        .map_err(|e| format!("Error en config de entrada: {}", e))?;
+
+    let sample_rate = config.sample_rate().0;
+    let channels = config.channels();
+    let sample_format = config.sample_format();
+
+    let (tx, rx) = std::sync::mpsc::channel::<Vec<f32>>();
+
+    let app_handle = app.clone();
+    std::thread::spawn(move || {
+        let mut speech_buffer = Vec::new();
+        let mut in_speech = false;
+        let mut silence_chunks = 0;
+        let mut speech_chunks = 0;
+
+        let rms_threshold: f32 = 0.015;
+        let silence_chunks_threshold: usize = 15;
+        let min_speech_chunks: usize = 3;
+
+        let chunk_size = (sample_rate as f32 * channels as f32 * 0.1) as usize;
+        let mut current_chunk = Vec::with_capacity(chunk_size);
+
+        while let Ok(samples) = rx.recv() {
+            current_chunk.extend(samples);
+            while current_chunk.len() >= chunk_size {
+                let chunk: Vec<f32> = current_chunk.drain(..chunk_size).collect();
+
+                let mut mono = Vec::new();
+                for frame in chunk.chunks(channels as usize) {
+                    let avg: f32 = frame.iter().sum::<f32>() / (frame.len() as f32);
+                    mono.push(avg);
+                }
+
+                let target_rate = 16000.0;
+                let ratio = target_rate / (sample_rate as f64);
+                let mut resampled = Vec::new();
+                let mut index = 0.0;
+                while index < mono.len() as f64 {
+                    let i = index.floor() as usize;
+                    let f = index - index.floor();
+                    if i + 1 < mono.len() {
+                        let val = mono[i] * (1.0 - f as f32) + mono[i + 1] * (f as f32);
+                        resampled.push(val);
+                    } else if i < mono.len() {
+                        resampled.push(mono[i]);
+                    }
+                    index += 1.0 / ratio;
+                }
+
+                let sum_sq: f32 = resampled.iter().map(|&x| x * x).sum();
+                let rms = (sum_sq / resampled.len() as f32).sqrt();
+
+                let is_active = rms > rms_threshold;
+
+                if is_active {
+                    silence_chunks = 0;
+                    if !in_speech {
+                        speech_chunks += 1;
+                        if speech_chunks >= min_speech_chunks {
+                            in_speech = true;
+                        }
+                    }
+                } else {
+                    speech_chunks = 0;
+                    if in_speech {
+                        silence_chunks += 1;
+                        if silence_chunks >= silence_chunks_threshold {
+                            in_speech = false;
+                            let audio_to_transcribe = speech_buffer.clone();
+                            speech_buffer.clear();
+
+                            let app_clone = app_handle.clone();
+                            tokio::spawn(async move {
+                                if let Err(e) = process_and_transcribe(audio_to_transcribe, app_clone).await {
+                                    eprintln!("[VAD] Error transcribiendo: {}", e);
+                                }
+                            });
+                        }
+                    }
+                }
+
+                if in_speech || (!in_speech && speech_chunks > 0) {
+                    speech_buffer.extend_from_slice(&resampled);
+                }
+            }
+        }
+    });
+
+    let error_callback = |err| eprintln!("Error en stream de audio: {}", err);
+
+    let stream = match sample_format {
+        cpal::SampleFormat::F32 => device.build_input_stream(
+            &config.into(),
+            move |data: &[f32], _| {
+                let _ = tx.send(data.to_vec());
+            },
+            error_callback,
+            None,
+        ),
+        cpal::SampleFormat::I16 => device.build_input_stream(
+            &config.into(),
+            move |data: &[i16], _| {
+                let f32_data: Vec<f32> = data.iter().map(|&x| x as f32 / 32768.0).collect();
+                let _ = tx.send(f32_data);
+            },
+            error_callback,
+            None,
+        ),
+        cpal::SampleFormat::U16 => device.build_input_stream(
+            &config.into(),
+            move |data: &[u16], _| {
+                let f32_data: Vec<f32> = data
+                    .iter()
+                    .map(|&x| (x as f32 - 32768.0) / 32768.0)
+                    .collect();
+                let _ = tx.send(f32_data);
+            },
+            error_callback,
+            None,
+        ),
+        _ => return Err("Formato de audio no soportado".to_string()),
+    }
+    .map_err(|e| format!("Error construyendo stream: {}", e))?;
+
+    stream.play().map_err(|e| format!("Error reproduciendo stream: {}", e))?;
+
+    state.stream = Some(SendStream(stream));
+    state.is_listening = true;
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn stop_continuous_listening() -> Result<(), String> {
+    let mut state = get_voice_state().lock().unwrap();
+    state.stream = None;
+    state.is_listening = false;
+    Ok(())
+}
+

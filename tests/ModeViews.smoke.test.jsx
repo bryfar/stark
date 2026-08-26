@@ -6,8 +6,18 @@ import { DesignChatPanel } from "../src/components/DesignChatPanel";
 import { DesignView } from "../src/components/DesignView";
 
 // Mock Tauri dynamic imports so effects resolve instantly
+if (typeof window !== "undefined") {
+  window.__TAURI_INTERNALS__ = window.__TAURI_INTERNALS__ || {
+    transformCallback: () => () => {},
+    invoke: () => Promise.resolve([]),
+  };
+}
+
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn().mockResolvedValue([]),
+}));
+vi.mock("@tauri-apps/api/event", () => ({
+  listen: vi.fn().mockResolvedValue(() => {}),
 }));
 
 describe("Smoke: mode views mount", () => {

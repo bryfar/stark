@@ -50,6 +50,15 @@ export function App() {
   const [reasoning, setReasoning] = useState(true);
   const [proposedEdit, setProposedEdit] = useState(null);
   const [proposedCommand, setProposedCommand] = useState(null);
+  const [bypassAllApprovals, setBypassAllApprovals] = useState(false);
+
+  const handleSetProposedCommand = (cmd) => {
+    if (bypassAllApprovals && cmd) {
+      handleApproveCommand(cmd.command || cmd, true);
+    } else {
+      setProposedCommand(cmd);
+    }
+  };
   const [isLocked, setIsLocked] = useState(false);
   const [isDoctorOpen, setIsDoctorOpen] = useState(false);
   const [isProviderManagerOpen, setIsProviderManagerOpen] = useState(false);
@@ -954,7 +963,14 @@ export function App() {
     setProposedEdit(null);
   };
 
-  const handleApproveCommand = async (command, perimeterMode) => {
+  const handleApproveCommand = async (
+    command,
+    perimeterMode,
+    alwaysApprove = false
+  ) => {
+    if (alwaysApprove) {
+      setBypassAllApprovals(true);
+    }
     const { invoke } = await import("@tauri-apps/api/core");
     await invoke("terminal_execute", {
       cmdStr: command,
@@ -1035,7 +1051,7 @@ export function App() {
             reasoning={reasoning}
             setReasoning={setReasoning}
             setProposedEdit={setProposedEdit}
-            setProposedCommand={setProposedCommand}
+            setProposedCommand={handleSetProposedCommand}
             providersConfig={providersConfig}
             onOpenProviderManager={() => setIsProviderManagerOpen(true)}
             onOpenModelSelector={() => setIsModelSelectorOpen(true)}
@@ -1049,6 +1065,9 @@ export function App() {
             workspacePath={workspacePath}
             lang={lang}
             fileTree={fileTree}
+            conversations={conversations}
+            chatMeta={chatMeta}
+            onSelectChat={handleSelectChat}
           />
         )}
         {(!activePage || activePage === "home") && currentMode === "code" && (

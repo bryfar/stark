@@ -14,6 +14,7 @@ import {
   Video,
   Presentation,
   Mic,
+  MicOff,
   ArrowUp,
   Plus,
   Settings,
@@ -52,6 +53,9 @@ export function ChatView({
   workspacePath,
   lang = "es",
   fileTree = [],
+  conversations = [],
+  chatMeta = {},
+  onSelectChat,
 }) {
   if (typeof window !== "undefined" && window.__renderProbe__)
     window.__renderProbe__("ChatView");
@@ -69,6 +73,48 @@ export function ChatView({
   const [customPlugins, setCustomPlugins] = useState([]);
   const [assetsVersion, setAssetsVersion] = useState(0);
   const [activeArtifact, setActiveArtifact] = useState(null);
+  const [showTreeMap, setShowTreeMap] = useState(false);
+
+  const getActiveFamilyTree = () => {
+    if (!activeChatId || !conversations || !chatMeta) return null;
+
+    let rootId = activeChatId;
+    let visited = new Set();
+    while (rootId) {
+      visited.add(rootId);
+      const meta = chatMeta[rootId];
+      if (
+        meta &&
+        meta.parent_id &&
+        conversations.some((x) => x.id === meta.parent_id) &&
+        !visited.has(meta.parent_id)
+      ) {
+        rootId = meta.parent_id;
+      } else {
+        break;
+      }
+    }
+
+    const rootConv = conversations.find((c) => c.id === rootId);
+    if (!rootConv) return null;
+
+    const buildNode = (conv) => {
+      const meta = chatMeta[conv.id] || {};
+      const children = conversations.filter((c) => {
+        const m = chatMeta[c.id];
+        return m && m.parent_id === conv.id;
+      });
+      return {
+        id: conv.id,
+        title: conv.title || "Conversación",
+        kind: meta.kind || "root",
+        isActive: conv.id === activeChatId,
+        children: children.map(buildNode),
+      };
+    };
+
+    return buildNode(rootConv);
+  };
   const fileInputRef = useRef(null);
   const dropupRef = useRef(null);
 
@@ -189,6 +235,58 @@ export function ChatView({
   const voice = useVoiceDictation({
     onText: (text) => setInput((prev) => (prev ? `${prev} ${text}` : text)),
   });
+
+  const [continuousMic, setContinuousMic] = useState(false);
+
+  const toggleContinuousMic = async () => {
+    const nextVal = !continuousMic;
+    setContinuousMic(nextVal);
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      if (nextVal) {
+        await invoke("start_continuous_listening");
+      } else {
+        await invoke("stop_continuous_listening");
+      }
+    } catch (err) {
+      console.error("Error toggling continuous mic:", err);
+      setContinuousMic(false);
+    }
+  };
+
+  useEffect(() => {
+    let unlisten;
+    const setupListener = async () => {
+      try {
+        const { listen } = await import("@tauri-apps/api/event");
+        unlisten = await listen("voice-speech-processed", (event) => {
+          const text = event.payload;
+          if (text && text.trim()) {
+            handleSend(text);
+          }
+        });
+      } catch (err) {
+        console.error(
+          "Error setting up continuous listening event listener:",
+          err
+        );
+      }
+    };
+    setupListener();
+    return () => {
+      if (unlisten) {
+        unlisten.then((f) => f());
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      import("@tauri-apps/api/core").then(({ invoke }) => {
+        invoke("stop_continuous_listening").catch(() => {});
+      });
+    };
+  }, []);
 
   const handleMicClick = () => {
     if (voice.status === "recording") {
@@ -490,11 +588,12 @@ export function ChatView({
     });
   };
 
-  const handleSend = async () => {
-    if (!input.trim() && attachments.length === 0) return;
+  const handleSend = async (textOverride) => {
+    const textToSend = typeof textOverride === "string" ? textOverride : input;
+    if (!textToSend.trim() && attachments.length === 0) return;
     if (isLoading) return;
 
-    let fullPrompt = input;
+    let fullPrompt = textToSend;
     if (selectedSkill) {
       fullPrompt = `[Skill Activa: /${selectedSkill.name}]\n${fullPrompt}`;
     }
@@ -535,7 +634,7 @@ export function ChatView({
       try {
         const files = await invoke("repo_context", {
           workspacePath: workspacePath,
-          prompt: input,
+          prompt: textToSend,
         });
         if (files && files.length) {
           const ctxBlock = files
@@ -841,6 +940,92 @@ export function ChatView({
             : "none",
         }}
       >
+        {/* Active Branch Path Breadcrumbs */}
+        {activeChatId && conversations && chatMeta && (
+          <div
+            style={{
+              padding: "10px 16px",
+              borderBottom: "1px solid var(--colors-hairline)",
+              background: "var(--colors-surface-dark-soft)",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              flexWrap: "wrap",
+              fontSize: "11.5px",
+              fontFamily: "var(--font-mono)",
+            }}
+          >
+            <span
+              style={{
+                color: "var(--colors-muted)",
+                display: "flex",
+                alignItems: "center",
+                gap: "4px",
+              }}
+            >
+              <GitBranch size={13} />
+              <span>{lang === "es" ? "Rama activa:" : "Active branch:"}</span>
+            </span>
+            {(() => {
+              const chain = [];
+              let currId = activeChatId;
+              let visited = new Set();
+              while (currId) {
+                visited.add(currId);
+                const meta = chatMeta[currId] || {};
+                const c = conversations.find((conv) => conv.id === currId);
+                if (c) {
+                  chain.push({ id: currId, title: c.title || "Sin título" });
+                  if (meta.parent_id && !visited.has(meta.parent_id)) {
+                    currId = meta.parent_id;
+                  } else {
+                    break;
+                  }
+                } else {
+                  break;
+                }
+              }
+              chain.reverse();
+
+              return chain.map((node, i) => (
+                <div
+                  key={node.id}
+                  style={{ display: "flex", alignItems: "center", gap: "6px" }}
+                >
+                  {i > 0 && (
+                    <span style={{ color: "var(--colors-muted)" }}>›</span>
+                  )}
+                  <button
+                    onClick={() => onSelectChat && onSelectChat(node.id)}
+                    style={{
+                      background:
+                        node.id === activeChatId
+                          ? "var(--colors-primary-soft)"
+                          : "transparent",
+                      border: "none",
+                      color:
+                        node.id === activeChatId
+                          ? "var(--colors-primary)"
+                          : "var(--colors-ink)",
+                      cursor: "pointer",
+                      padding: "2px 6px",
+                      borderRadius: "4px",
+                      fontWeight: node.id === activeChatId ? "700" : "normal",
+                      fontSize: "11.5px",
+                      maxWidth: "140px",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                    title={node.title}
+                  >
+                    {node.title}
+                  </button>
+                </div>
+              ));
+            })()}
+          </div>
+        )}
         <div className="messages-list">
           {messages.length === 0 && !isLoading && (
             <div className="chat-empty-state">
@@ -1099,6 +1284,34 @@ export function ChatView({
               <div
                 style={{ display: "flex", alignItems: "center", gap: "6px" }}
               >
+                <button
+                  onClick={() => setShowTreeMap(!showTreeMap)}
+                  className="btn-secondary"
+                  style={{
+                    fontSize: "11px",
+                    padding: "5px 10px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "5px",
+                    border: showTreeMap
+                      ? "1px solid var(--colors-primary)"
+                      : "1px solid var(--colors-hairline)",
+                    background: showTreeMap
+                      ? "var(--colors-primary-soft)"
+                      : "transparent",
+                    color: showTreeMap
+                      ? "var(--colors-primary-strong)"
+                      : "inherit",
+                  }}
+                  title={
+                    lang === "es"
+                      ? "Visualizar Árbol de Bifurcaciones"
+                      : "Visualize Branch Tree"
+                  }
+                >
+                  <GitBranch size={13} strokeWidth={1.75} />{" "}
+                  {lang === "es" ? "Ver Árbol" : "Show Tree"}
+                </button>
                 <button
                   onClick={() => onForkChat && onForkChat(activeChatId)}
                   disabled={!activeChatId}
@@ -1585,6 +1798,34 @@ export function ChatView({
                   <Mic size={16} strokeWidth={1.75} />
                 </button>
                 <button
+                  onClick={toggleContinuousMic}
+                  style={{
+                    width: "32px",
+                    height: "32px",
+                    borderRadius: "50%",
+                    background: continuousMic
+                      ? "var(--colors-danger, #ef4444)"
+                      : "transparent",
+                    border: "1px solid var(--colors-hairline)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: "pointer",
+                    color: continuousMic ? "#ffffff" : "var(--colors-ink)",
+                  }}
+                  title={
+                    continuousMic
+                      ? "Desactivar Micrófono Siempre Activo"
+                      : "Activar Micrófono Siempre Activo (Voz Continua)"
+                  }
+                >
+                  {continuousMic ? (
+                    <Mic size={16} strokeWidth={1.75} />
+                  ) : (
+                    <MicOff size={16} strokeWidth={1.75} />
+                  )}
+                </button>
+                <button
                   onClick={isLoading ? handleStop : handleSend}
                   style={{
                     width: "32px",
@@ -1647,6 +1888,178 @@ export function ChatView({
           workspacePath={workspacePath}
         />
       </div>
+      {showTreeMap && (
+        <div
+          style={{
+            width: "300px",
+            display: "flex",
+            flexDirection: "column",
+            height: "100%",
+            background: "var(--colors-surface-dark-soft)",
+            borderLeft: "1px solid var(--colors-hairline)",
+            minWidth: "260px",
+          }}
+        >
+          {/* Tree Map Header */}
+          <div
+            style={{
+              padding: "12px 16px",
+              borderBottom: "1px solid var(--colors-hairline)",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            <h3
+              style={{
+                margin: 0,
+                fontSize: "13px",
+                fontFamily: "var(--font-mono)",
+                fontWeight: "700",
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                color: "var(--colors-ink)",
+              }}
+            >
+              <GitBranch size={14} strokeWidth={1.75} />
+              <span>
+                {lang === "es" ? "Árbol de Bifurcaciones" : "Branch Tree"}
+              </span>
+            </h3>
+            <button
+              onClick={() => setShowTreeMap(false)}
+              style={{
+                background: "transparent",
+                border: "none",
+                color: "var(--colors-muted)",
+                cursor: "pointer",
+                fontSize: "13px",
+              }}
+              title={lang === "es" ? "Cerrar Panel" : "Close Panel"}
+            >
+              [✕]
+            </button>
+          </div>
+          {/* Tree Map Body */}
+          <div
+            style={{
+              flex: 1,
+              overflow: "auto",
+              padding: "16px",
+              fontSize: "12px",
+              fontFamily: "var(--font-mono)",
+            }}
+          >
+            {(() => {
+              const rootNode = getActiveFamilyTree();
+              if (!rootNode) {
+                return (
+                  <div
+                    style={{
+                      color: "var(--colors-muted)",
+                      textAlign: "center",
+                      marginTop: "20px",
+                    }}
+                  >
+                    {lang === "es"
+                      ? "No hay bifurcaciones en esta sesión"
+                      : "No branches in this session"}
+                  </div>
+                );
+              }
+
+              const renderTreeNode = (node, depth = 0) => {
+                const isCurrent = node.id === activeChatId;
+                return (
+                  <div
+                    key={node.id}
+                    style={{
+                      marginLeft: depth > 0 ? "16px" : "0",
+                      marginBottom: "6px",
+                    }}
+                  >
+                    <div
+                      onClick={() => onSelectChat && onSelectChat(node.id)}
+                      style={{
+                        padding: "6px 10px",
+                        borderRadius: "6px",
+                        cursor: "pointer",
+                        background: isCurrent
+                          ? "var(--colors-primary-soft)"
+                          : "var(--colors-surface-dark-elevated)",
+                        border: isCurrent
+                          ? "1px solid var(--colors-primary)"
+                          : "1px solid var(--colors-hairline)",
+                        color: isCurrent
+                          ? "var(--colors-primary-strong)"
+                          : "var(--colors-ink)",
+                        fontWeight: isCurrent ? "700" : "normal",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        transition: "all 0.15s ease",
+                      }}
+                    >
+                      <GitBranch
+                        size={12}
+                        style={{
+                          color: isCurrent
+                            ? "var(--colors-primary)"
+                            : "var(--colors-muted)",
+                          transform:
+                            node.children.length > 0 ? "none" : "rotate(90deg)",
+                        }}
+                      />
+                      <span
+                        style={{
+                          flex: 1,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                        title={node.title}
+                      >
+                        {node.title}
+                      </span>
+                      {isCurrent && (
+                        <span
+                          style={{
+                            fontSize: "9px",
+                            background: "var(--colors-primary)",
+                            color: "#fff",
+                            padding: "1px 4px",
+                            borderRadius: "3px",
+                          }}
+                        >
+                          {lang === "es" ? "Activo" : "Active"}
+                        </span>
+                      )}
+                    </div>
+                    {node.children && node.children.length > 0 && (
+                      <div
+                        style={{
+                          borderLeft:
+                            "1px dashed var(--colors-hairline-strong)",
+                          marginLeft: "10px",
+                          paddingLeft: "6px",
+                          marginTop: "4px",
+                        }}
+                      >
+                        {node.children.map((child) =>
+                          renderTreeNode(child, depth + 1)
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              };
+
+              return renderTreeNode(rootNode);
+            })()}
+          </div>
+        </div>
+      )}
       {activeArtifact && (
         <div
           style={{

@@ -6,6 +6,7 @@ export function TerminalModal({ proposedCommand, onApprove, onReject }) {
 
   const { command } = proposedCommand;
   const [perimeterMode, setPerimeterMode] = useState(true);
+  const [alwaysApprove, setAlwaysApprove] = useState(false);
   const [running, setRunning] = useState(false);
   const [finished, setFinished] = useState(false);
   const [output, setOutput] = useState([]);
@@ -33,7 +34,7 @@ export function TerminalModal({ proposedCommand, onApprove, onReject }) {
     } catch {}
 
     try {
-      if (onApprove) await onApprove(command, perimeterMode);
+      if (onApprove) await onApprove(command, perimeterMode, alwaysApprove);
     } catch (err) {
       setOutput((prev) => [...prev, `[Error]: ${String(err)}`]);
     } finally {
@@ -128,6 +129,23 @@ export function TerminalModal({ proposedCommand, onApprove, onReject }) {
               onChange={(e) => setPerimeterMode(e.target.checked)}
             />
             [Secured: Aislamiento Perimetral (Bloquear red externa)]
+          </label>
+          <label
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              cursor: "pointer",
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={alwaysApprove}
+              disabled={running}
+              onChange={(e) => setAlwaysApprove(e.target.checked)}
+            />
+            [Aprobar todos los comandos de computadora automáticamente en esta
+            sesión]
           </label>
         </div>
 

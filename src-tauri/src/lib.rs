@@ -9,6 +9,8 @@ pub mod cli;
 pub mod crash;
 pub mod eventsink;
 pub mod local;
+pub mod voice;
+
 
 use hardware::{detect_hardware_tier, HardwareInfo};
 use providers::types::{LocalModelInfo, ProviderConfig, ProviderSavePayload, SendChatPayload};
@@ -637,8 +639,10 @@ pub fn run() {
             usage_records,
             usage_by_model,
             usage_by_op,
-            skills_install_bundled,
-            skills_install_symlinks
+                        skills_install_bundled,
+            skills_install_symlinks,
+            voice::start_continuous_listening,
+            voice::stop_continuous_listening
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
