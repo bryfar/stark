@@ -9,7 +9,7 @@ Este documento especifica la arquitectura, especificaciones técnicas y fases de
 - **Identidad Funcional:** Reconstruir de manera nativa la lógica y arquitectura del arnés de Hermes (basado en el modelo de agentes asíncronos y compactación de memoria persistente) directamente en el backend de Rust (Tauri 2) y frontend de Preact, sin clonación de dependencias externas.
 - **Voz en Tiempo Real (Micrófono Siempre Activo):** Permitir al usuario interactuar mediante voz sin presionar botones constantemente, implementando Detección de Actividad de Voz (VAD) local en el backend y streaming asíncrono hacia Whisper.
 - **Consentimiento Único para Computer Use:** Evitar ventanas emergentes repetitivas al solicitar permisos para herramientas de terminal o de escritorio, permitiendo la aprobación automática tras un único consentimiento del usuario por sesión o de forma permanente.
-- **Gestión del Contexto e Historial Resiliente:** Habilitar un almacenamiento de sesiones de manera estructurada en forma de árbol (con referencias `id`/`parentId`), permitiendo bifurcaciones (branching) y retrocesos de estado.
+- **Gestión del Contexto e Historial Resiliente:** Habilitar un almacenamiento de sesiones basado en JSONL estructurado en forma de árbol (con referencias `id`/`parentId`), permitiendo bifurcaciones (branching) y retrocesos de estado.
 
 ---
 
@@ -86,13 +86,13 @@ graph TD
 
 ### Fase 1: Automatización de Permisos y Voz Continua (Hitos 1-2)
 
-1.  Modificar la UI en Preact para soportar un toggle de **Micrófono Siempre Activo** y actualizar el modal de confirmación de terminal con la casilla **"Aprobar siempre en esta sesión"**.
+1.  Modificar la UI en Preact para soportar un toggle de **Micrófono Siempre Activo** y actualizar el modal de confirmación de terminal con la casilla **"Aprobar siempre en esta sesión"**. -> **[COMPLETADO ✅]**
 2.  Implementar el listener de audio continuo con VAD y la cola de transcripción asíncrona en Rust.
-3.  Actualizar la lógica de [`PermissionMode`](file:///home/bryan/Downloads/Repos/crafter-repo/src-tauri/src/agent/permissions/modes.rs) para almacenar y aplicar el bypass de consentimiento una vez aprobado.
+3.  Actualizar la lógica de [`PermissionMode`](file:///home/bryan/Downloads/Repos/crafter-repo/src-tauri/src/agent/permissions/modes.rs) para almacenar y aplicar el bypass de consentimiento una vez aprobado. -> **[COMPLETADO ✅]**
 
 ### Fase 2: Almacenamiento en Árbol y Bifurcación de Sesiones (Hitos 3-4)
 
-1.  Implementar `eventsourcing.rs` en Rust para gestionar logs JSONL vinculados por `parentId`.
+1.  Implementar `eventsourcing.rs` in Rust para gestionar logs JSONL vinculados por `parentId`.
 2.  Agregar soporte en el frontend para visualizar el árbol de la sesión y permitir al usuario retroceder a un paso previo para tomar una rama alternativa de refactorización.
 
 ### Fase 3: Conexión de Notificadores y Aprendizaje Estético en Diseño (Hito 5)
