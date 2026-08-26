@@ -8,7 +8,7 @@ export const translations = {
       pages: "Páginas",
       history: "Historial",
       olderChats: "Chats anteriores...",
-      settings: "Configuración"
+      settings: "Configuración",
     },
     header: {
       hideSidebar: "Ocultar Sidebar",
@@ -19,7 +19,7 @@ export const translations = {
       light: "Claro",
       minimize: "Minimizar",
       maximize: "Maximizar",
-      close: "Cerrar"
+      close: "Cerrar",
     },
     settings: {
       title: "Configuración del Sistema",
@@ -45,7 +45,7 @@ export const translations = {
       apply: "Aplicar Cambios",
       closeBtn: "Cerrar",
       bubblewrap: "Bubblewrap (Aislamiento de namespaces)",
-      firejail: "Firejail (Perfiles ligeros)"
+      firejail: "Firejail (Perfiles ligeros)",
     },
     chat: {
       welcome: "Hola, soy Stark",
@@ -54,12 +54,28 @@ export const translations = {
       planMode: "Modo Planificación",
       buildMode: "Modo Construcción",
       reasoning: "Pensamiento",
+      reasoningIn: "Razonando respuesta en",
       send: "Enviar",
+      stop: "Detener",
       runInfo: "↵ para ejecutar · Shift+↵ para nueva línea",
       cancel: "Cancelar",
       detecting: "Detectando Ollama local...",
       noModel: "Seleccionar Modelo",
-      changeModel: "Cambiar"
+      changeModel: "Cambiar",
+      escalateAction: "Escalar a nube",
+      escalateBanner: "El modelo local no pudo responder con seguridad",
+      escalatePrefix: "Escalado a",
+      escalateDefaultReason: "respuesta de baja confianza",
+      escalateReply: "Responde a mi ultima pregunta.",
+      noCloudProvider:
+        "Configura un proveedor cloud en Proveedores para poder escalar.",
+      escalateError: "Error al escalar",
+      forkAction: "Rama",
+      compactAction: "Compactar",
+      compactSuggest: "Conversación larga, sugiere compactar",
+      autoEscalateLabel: "Auto-escalado",
+      autoEscalateToggle:
+        "Escalar automáticamente al proveedor cloud cuando el modelo local no responda con seguridad",
     },
     doctor: {
       title: "Stark Doctor — Diagnóstico de Entorno Linux",
@@ -72,8 +88,8 @@ export const translations = {
       memoryUsage: "Consumo de Memoria",
       reScan: "Re-ejecutar Diagnóstico",
       scanning: "Re-escaneando...",
-      close: "Cerrar Doctor"
-    }
+      close: "Cerrar Doctor",
+    },
   },
   en: {
     sidebar: {
@@ -84,7 +100,7 @@ export const translations = {
       pages: "Pages",
       history: "History",
       olderChats: "Older chats...",
-      settings: "Settings"
+      settings: "Settings",
     },
     header: {
       hideSidebar: "Hide Sidebar",
@@ -95,7 +111,7 @@ export const translations = {
       light: "Light",
       minimize: "Minimize",
       maximize: "Maximize",
-      close: "Close"
+      close: "Close",
     },
     settings: {
       title: "System Settings",
@@ -121,7 +137,7 @@ export const translations = {
       apply: "Apply Changes",
       closeBtn: "Close",
       bubblewrap: "Bubblewrap (Namespace-level isolation)",
-      firejail: "Firejail (Lightweight profiles)"
+      firejail: "Firejail (Lightweight profiles)",
     },
     chat: {
       welcome: "Hello, I am Stark",
@@ -130,12 +146,27 @@ export const translations = {
       planMode: "Plan Mode",
       buildMode: "Build Mode",
       reasoning: "Reasoning",
+      reasoningIn: "Reasoning response in",
       send: "Send",
+      stop: "Stop",
       runInfo: "↵ to run · Shift+↵ for new line",
       cancel: "Cancel",
       detecting: "Detecting local Ollama...",
       noModel: "Select Model",
-      changeModel: "Change"
+      changeModel: "Change",
+      escalateAction: "Escalate to cloud",
+      escalateBanner: "The local model could not answer confidently",
+      escalatePrefix: "Escalated to",
+      escalateDefaultReason: "low-confidence answer",
+      escalateReply: "Answer my last question.",
+      noCloudProvider: "Configure a cloud provider in Providers to escalate.",
+      escalateError: "Error escalating",
+      forkAction: "Branch",
+      compactAction: "Compact",
+      compactSuggest: "Long conversation, consider compacting",
+      autoEscalateLabel: "Auto-escalate",
+      autoEscalateToggle:
+        "Automatically escalate to the cloud provider when the local model answers without confidence",
     },
     doctor: {
       title: "Stark Doctor — Linux Environment Diagnosis",
@@ -148,7 +179,7 @@ export const translations = {
       memoryUsage: "Memory Usage",
       reScan: "Re-run Diagnostics",
       scanning: "Rescanning...",
-      close: "Close Doctor"
-    }
-  }
+      close: "Close Doctor",
+    },
+  },
 };

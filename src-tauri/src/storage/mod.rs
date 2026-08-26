@@ -1,18 +1,32 @@
+pub mod chats;
 pub mod crypto;
+pub mod keyring;
 pub mod providers_store;
+pub mod records;
+pub mod usage;
 
+pub use keyring::keyring_available;
 pub use providers_store::{
     delete_provider, get_provider, load_api_key, load_providers, parse_kind, preset_providers,
     save_api_key, save_providers, upsert_provider,
 };
+pub use keyring::keyring_has_master_key;
 
 use crypto::{decrypt_aes_gcm, derive_key_argon2, encrypt_aes_gcm};
+use keyring::{keyring_get_master_key, keyring_set_master_key};
 use std::fs;
 use std::path::Path;
 use std::sync::Mutex;
 
 static MEMORY_KEY: Mutex<Option<[u8; 32]>> = Mutex::new(None);
 static FIXED_SALT: [u8; 16] = [15, 24, 33, 42, 51, 60, 79, 88, 97, 106, 115, 124, 133, 142, 151, 160];
+
+pub fn is_unlocked() -> bool {
+    match MEMORY_KEY.lock() {
+        Ok(l) => l.is_some(),
+        Err(_) => false,
+    }
+}
 
 pub fn get_storage_master_key() -> Result<[u8; 32], String> {
     let lock = MEMORY_KEY.lock().map_err(|e| e.to_string())?;
@@ -22,10 +36,29 @@ pub fn get_storage_master_key() -> Result<[u8; 32], String> {
     }
 }
 
+/// Unlocks storage. Tries the OS keyring first; if a master key exists there it
+/// is loaded directly (silent auto-unlock on later runs). Otherwise derives the
+/// key from the passphrase via Argon2id and persists it to the keyring when
+/// available.
 pub fn unlock_storage(passphrase: &str) -> Result<bool, String> {
+    if let Some(key) = keyring_get_master_key() {
+        let mut lock = MEMORY_KEY.lock().map_err(|e| e.to_string())?;
+        *lock = Some(key);
+        return Ok(true);
+    }
+
     let derived = derive_key_argon2(passphrase, &FIXED_SALT)?;
     let mut lock = MEMORY_KEY.lock().map_err(|e| e.to_string())?;
     *lock = Some(derived);
+
+    // Best-effort: persist to keyring so future launches unlock silently.
+    let _ = keyring_set_master_key(&derived);
+    Ok(true)
+}
+
+pub fn lock_storage() -> Result<bool, String> {
+    let mut lock = MEMORY_KEY.lock().map_err(|e| e.to_string())?;
+    *lock = None;
     Ok(true)
 }
 

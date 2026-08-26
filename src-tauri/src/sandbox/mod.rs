@@ -1,6 +1,7 @@
+use crate::eventsink::SharedSink;
 use serde::{Deserialize, Serialize};
 use std::process::Stdio;
-use tauri::{AppHandle, Emitter};
+use std::sync::Arc;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
 use tokio::time::{timeout, Duration};
@@ -29,7 +30,7 @@ pub async fn execute_sandboxed_command(
     workspace_path: &str,
     mode: SandboxMode,
     timeout_secs: u64,
-    app: AppHandle,
+    sink: SharedSink,
 ) -> Result<ExecutionResult, String> {
     // Si bwrap o firejail existen en el sistema, envolver el comando
     let mut bwrap_cmd = Command::new("bwrap");
@@ -75,8 +76,8 @@ pub async fn execute_sandboxed_command(
     let stdout = child.stdout.take().ok_or("No se pudo capturar stdout")?;
     let stderr = child.stderr.take().ok_or("No se pudo capturar stderr")?;
 
-    let app_handle_1 = app.clone();
-    let app_handle_2 = app.clone();
+    let stdout_sink = Arc::clone(&sink);
+    let stderr_sink = Arc::clone(&sink);
 
     let stdout_task = tokio::spawn(async move {
         let mut reader = BufReader::new(stdout).lines();
@@ -84,12 +85,13 @@ pub async fn execute_sandboxed_command(
         while let Ok(Some(line)) = reader.next_line().await {
             captured.push_str(&line);
             captured.push('\n');
-            let _ = app_handle_1.emit(
+            stdout_sink.emit(
                 "terminal:stdout",
-                TerminalChunk {
+                serde_json::to_value(TerminalChunk {
                     stream: "stdout".to_string(),
                     line,
-                },
+                })
+                .unwrap_or_default(),
             );
         }
         captured
@@ -101,12 +103,13 @@ pub async fn execute_sandboxed_command(
         while let Ok(Some(line)) = reader.next_line().await {
             captured.push_str(&line);
             captured.push('\n');
-            let _ = app_handle_2.emit(
+            stderr_sink.emit(
                 "terminal:stderr",
-                TerminalChunk {
+                serde_json::to_value(TerminalChunk {
                     stream: "stderr".to_string(),
                     line,
-                },
+                })
+                .unwrap_or_default(),
             );
         }
         captured
@@ -124,9 +127,17 @@ pub async fn execute_sandboxed_command(
     };
 
     match timeout(Duration::from_secs(timeout_secs), exec_future).await {
-        Ok(res) => res,
+        Ok(res) => {
+            let exit_code = match &res {
+                Ok(r) => r.exit_code,
+                Err(_) => -1,
+            };
+            sink.emit("terminal:exit", serde_json::json!(exit_code));
+            res
+        }
         Err(_) => {
             let _ = child.kill().await;
+            sink.emit("terminal:exit", serde_json::json!(-1));
             Err(format!(
                 "El comando excedió el tiempo límite de ejecución ({:?}s)",
                 timeout_secs

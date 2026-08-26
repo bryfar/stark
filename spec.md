@@ -6,8 +6,8 @@ spec: true
 
 # Crafter — Especificación Técnica Exhaustiva (Spec Document)
 
-> **Ubicación del archivo:** [`/home/bryan/Downloads/Repos/crafter-repo/spec.md`](file:///home/bryan/Downloads/Repos/crafter-repo/spec.md)  
-> **Fuentes analizadas:** [`goal.md`](file:///home/bryan/Downloads/Repos/crafter-repo/goal.md), [`tech-design.md`](file:///home/bryan/Downloads/Repos/crafter-repo/tech-design.md), [`grill-me.md`](file:///home/bryan/Downloads/Repos/crafter-repo/grill-me.md), [`shaping.md`](file:///home/bryan/Downloads/Repos/crafter-repo/shaping.md), [`breadboarding.md`](file:///home/bryan/Downloads/Repos/crafter-repo/breadboarding.md).
+> **Ubicación del archivo:** [`/home/bryan/Downloads/Repos/stark/spec.md`](file:///home/bryan/Downloads/Repos/stark/spec.md)  
+> **Fuentes analizadas:** [`goal.md`](file:///home/bryan/Downloads/Repos/stark/goal.md), [`tech-design.md`](file:///home/bryan/Downloads/Repos/stark/tech-design.md), [`grill-me.md`](file:///home/bryan/Downloads/Repos/stark/grill-me.md), [`shaping.md`](file:///home/bryan/Downloads/Repos/stark/shaping.md), [`breadboarding.md`](file:///home/bryan/Downloads/Repos/stark/breadboarding.md).
 
 ---
 
@@ -19,7 +19,7 @@ Los desarrolladores que trabajan en distribuciones Linux sufren con los agentes 
 
 ## Solution
 
-**Crafter** es un agente de codificación AI modelo-agnóstico en formato de aplicación de escritorio súper ligera para Linux. Basado en **Tauri v2** (backend Rust) y **Svelte 5** (frontend compilado a JS nativo sin runtime VDOM), Crafter garantiza un consumo en reposo menor a 300–500 MB de RAM y un arranque en menos de 5 segundos. 
+**Crafter** es un agente de codificación AI modelo-agnóstico en formato de aplicación de escritorio súper ligera para Linux. Basado en **Tauri v2** (backend Rust) y **Preact** (frontend con runtime VDOM ~3 KB gz, JSX-compatible con React), Crafter garantiza un consumo en reposo menor a 300–500 MB de RAM y un arranque en menos de 5 segundos.
 
 Permite conectar alternativamente a OpenAI, Anthropic, Google Gemini y modelos locales vía Ollama. Incluye separación clara entre **Modo Plan** (análisis sin mutación) y **Modo Build** (edición de código con aprobación visual de diffs), así como un **terminal sandbox** basado en `bubblewrap`/`firejail` y cifrado en reposo AES-256-GCM.
 
@@ -88,47 +88,65 @@ Permite conectar alternativamente a OpenAI, Anthropic, Google Gemini y modelos l
 
 - **`hardware::*` Module:**
   - Uso de `sysinfo` para lectura de memoria RAM disponible, cores CPU y métricas VRAM.
-  - Mapeo automático a Ollama Tiers: *Lite* (<4GB), *Basic* (4–8GB), *Standard* (8–16GB), *Pro* (>16GB).
+  - Mapeo automático a Ollama Tiers: _Lite_ (<4GB), _Basic_ (4–8GB), _Standard_ (8–16GB), _Pro_ (>16GB).
 
 ### 2. Frontend Contracts & Architecture (`src/`)
 
-- **Svelte 5 / Preact Component Architecture:**
-  - `$state` / Runes o Reactivity Hooks para renderizado sin bloqueo (<50ms latencia de UI por frame).
+- **Preact Component Architecture (JSX):**
+  - Reactivity Hooks (`useState`/`useEffect`/`useRef` de `preact/hooks`) con renderizado difuso de ~3 KB gz para latencia de UI <50ms por frame.
   - Estado global dividido en `configStore` (proveedor, modelo, modo plan/build, reasoning) y `conversationStore` (mensajes, tokens gastados, búfer de streaming).
   - Componentes principales: `HeaderBar`, `Sidebar`, `ChatView`, `CodeView`, `DesignView`, `DiffModal` (P2), `TerminalModal` (P3) y `UnlockModal` (P4).
 
 ### 3. Protocolo de Comandos e IPC Tauri
 
-| Comando Tauri | Dirección | Payload Entrada | Eventos Emitidos |
-|---------------|-----------|-----------------|------------------|
-| `send_chat_message` | UI → Rust | `SendChatPayload` (incluye `provider_id`, `model`) | `chat-token` (`StreamEvent`) |
-| `edit:apply` | UI → Rust | `{ action_id: string }` | `edit:success` |
-| `terminal:execute` | UI → Rust | `{ command: string, sandbox_mode: string }` | `terminal:stdout`, `terminal:stderr`, `terminal:exit` |
-| `crypto:unlock` | UI → Rust | `{ passphrase: string }` | `crypto:ready` |
-| `hardware:detect` | UI → Rust | N/A | `hardware:info` |
-| `providers_list` | UI → Rust | N/A | — (retorna `Vec<ProviderConfig>`, presets si no hay fichero) |
-| `providers_seed_presets` | UI → Rust | N/A | — (recrea los presets) |
-| `providers_save` | UI → Rust | `ProviderSavePayload` | — |
-| `providers_delete` | UI → Rust | `{ id: string }` | — |
-| `providers_detect_models` | UI → Rust | `{ provider_id: string }` | — (retorna `Vec<LocalModelInfo>` con tamaño en GB) |
-| `providers_install_model` | UI → Rust | `{ model_name: string }` | — (`ollama pull`, retorna stdout/err) |
+| Comando Tauri                  | Dirección | Payload Entrada                                                | Eventos Emitidos                                                |
+| ------------------------------ | --------- | -------------------------------------------------------------- | --------------------------------------------------------------- |
+| `send_chat_message`            | UI → Rust | `SendChatPayload` (incluye `provider_id`, `model`)             | `chat-token` (`StreamEvent`)                                    |
+| `repo_index`                   | UI → Rust | `{ workspace_path }`                                           | — (retorna el árbol de ficheros)                                |
+| `repo_context`                 | UI → Rust | `{ workspace_path, prompt }`                                   | — (retorna `Vec<ContextFile>`)                                  |
+| `attachment_read`              | UI → Rust | `{ path }`                                                     | — (retorna `AttachmentContent`: texto/pdf/imagen/binary)        |
+| `edit_apply`                   | UI → Rust | `ApplyEditPayload` (`file_path`, `new_content`, `description`) | — (aplica + escribe `.crafter_audit.log`; retorna `EditResult`) |
+| `audit_log_list`               | UI → Rust | `{ max_lines? }`                                               | — (retorna entradas de `.crafter_audit.log`)                    |
+| `terminal_execute`             | UI → Rust | `{ cmd_str, workspace_path, perimeter_mode, timeout_secs }`    | `terminal:stdout`, `terminal:stderr`, `terminal:exit`           |
+| `terminal_execute_ssh`         | UI → Rust | `{ cmd_str, host, timeout_secs }`                              | — (ejecución SSH)                                               |
+| `crypto_unlock`                | UI → Rust | `{ passphrase? }`                                              | `crypto:ready` (`{ unlocked }`)                                 |
+| `crypto_status`                | UI → Rust | N/A                                                            | `crypto:ready` (`{ unlocked: false }`)                          |
+| `crypto_lock`                  | UI → Rust | N/A                                                            | `crypto:ready` (`{ unlocked: false }`)                          |
+| `hardware_detect`              | UI → Rust | N/A                                                            | — (retorna `{ tier, recommended_models }`)                      |
+| `providers_list`               | UI → Rust | N/A                                                            | — (retorna `Vec<ProviderConfig>`, presets si no hay fichero)    |
+| `providers_seed_presets`       | UI → Rust | N/A                                                            | — (recrea los presets)                                          |
+| `providers_save`               | UI → Rust | `ProviderSavePayload`                                          | —                                                               |
+| `providers_delete`             | UI → Rust | `{ id: string }`                                               | —                                                               |
+| `providers_detect_models`      | UI → Rust | `{ provider_id: string }`                                      | — (retorna `Vec<LocalModelInfo>` con tamaño en GB)              |
+| `providers_install_model`      | UI → Rust | `{ model_name: string }`                                       | — (`ollama pull`, retorna stdout/err)                           |
+| `skills_list`                  | UI → Rust | N/A                                                            | — (retorna `Vec<SkillInfo>`)                                    |
+| `skills_read`                  | UI → Rust | `{ skill_id }`                                                 | — (retorna contenido Markdown)                                  |
+| `voice_record`                 | UI → Rust | `{ seconds }`                                                  | — (retorna audio base64)                                        |
+| `voice_transcribe`             | UI → Rust | `{ audio_base64 }`                                             | — (Whisper local)                                               |
+| `voice_setup` / `voice_status` | UI → Rust | N/A                                                            | — (instala/reporta Whisper)                                     |
+| `chat_delete`                  | UI → Rust | `{ chat_id }`                                                  | —                                                               |
+| `workspace_multi_root_save`    | UI → Rust | `{ path, label? }`                                             | —                                                               |
+| `workspace_multi_root_load`    | UI → Rust | N/A                                                            | — (retorna raíces guardadas)                                    |
 
 ---
 
 ## Testing Decisions
 
 ### 1. Criterios de Calidad de Pruebas
+
 - Las pruebas deben verificar únicamente el comportamiento externo de los módulos y contratos IPC/API, nunca los detalles de implementación interna.
 - Los adaptadores LLM se probarán aislando llamadas HTTP simuladas (mocking de respuestas SSE) y con smoke tests de endpoints reales cuando haya credenciales disponibles.
 - El módulo de cifrado comprobará la simetría descifrando de vuelta el texto plano original y rechazando claves no válidas.
 
 ### 2. Módulos bajo Pruebas
+
 - `src-tauri/src/providers/*`: Pruebas de deserialización de JSON, emisión de eventos `StreamEvent` y manejo de errores HTTP.
 - `src-tauri/src/storage/*`: Pruebas de derivación Argon2id y cifrado/descifrado AES-256-GCM. `providers_store`: roundtrip save/load, upsert/delete, cifrado de API keys.
 - `src-tauri/src/sandbox/*`: Pruebas de invocación de subprocesos aislados y captura de timeouts.
 - Frontend: Build tests estáticos sin errores (`bun run build`).
 
 ### 3. Prior Art
+
 - Patrones de prueba de Tauri IPC con eventos simulados (`tauri::test::mock_builder`).
 - Suite de pruebas de cifrado estándar Rust (`aes-gcm` y `argon2` crates test vectors).
 
@@ -146,4 +164,4 @@ Permite conectar alternativamente a OpenAI, Anthropic, Google Gemini y modelos l
 ## Further Notes
 
 - Se ha priorizado la arquitectura monolítica en Tauri 2 por ofrecer el mejor rendimiento de memoria (<300–500MB en reposo) frente a soluciones desacopladas con demonios en segundo plano o entornos Electron.
-- La extensión de habilidades (*Skills*) lee cualquier carpeta `.agents/skills/` o `.gemini/skills/` tanto a nivel local del repositorio como global en el sistema del usuario.
+- La extensión de habilidades (_Skills_) lee cualquier carpeta `.agents/skills/` o `.gemini/skills/` tanto a nivel local del repositorio como global en el sistema del usuario.

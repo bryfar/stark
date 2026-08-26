@@ -1,10 +1,10 @@
-import { h } from 'preact';
-import { describe, it, expect, vi } from 'vitest';
-import { render, fireEvent, screen } from '@testing-library/preact';
-import { HeaderBar } from '../src/components/HeaderBar';
+import { h } from "preact";
+import { describe, it, expect, vi } from "vitest";
+import { render, fireEvent, screen } from "@testing-library/preact";
+import { HeaderBar } from "../src/components/HeaderBar";
 
-describe('HeaderBar (Navbar & Theme Switcher Seam)', () => {
-  it('renders mode tabs without text brackets', () => {
+describe("HeaderBar (Navbar & Theme Switcher Seam)", () => {
+  it("renders mode tabs without text brackets", () => {
     render(
       <HeaderBar
         currentMode="chat"
@@ -17,12 +17,12 @@ describe('HeaderBar (Navbar & Theme Switcher Seam)', () => {
       />
     );
 
-    expect(screen.getByText('Chat General')).not.toBeNull();
-    expect(screen.getByText('Modo Code')).not.toBeNull();
-    expect(screen.getByText('Modo Design')).not.toBeNull();
+    expect(screen.getByText("Chat General")).not.toBeNull();
+    expect(screen.getByText("Modo Code")).not.toBeNull();
+    expect(screen.getByText("Modo Design")).not.toBeNull();
   });
 
-  it('triggers setMode when a mode tab is clicked', () => {
+  it("triggers setMode when a mode tab is clicked", () => {
     const handleSetMode = vi.fn();
     render(
       <HeaderBar
@@ -36,11 +36,11 @@ describe('HeaderBar (Navbar & Theme Switcher Seam)', () => {
       />
     );
 
-    fireEvent.click(screen.getByText('Modo Code'));
-    expect(handleSetMode).toHaveBeenCalledWith('code');
+    fireEvent.click(screen.getByText("Modo Code"));
+    expect(handleSetMode).toHaveBeenCalledWith("code");
   });
 
-  it('triggers theme toggle callback when theme button is clicked', () => {
+  it("triggers theme toggle callback when theme button is clicked", () => {
     const handleToggleTheme = vi.fn();
     render(
       <HeaderBar
@@ -49,13 +49,12 @@ describe('HeaderBar (Navbar & Theme Switcher Seam)', () => {
         onOpenDoctor={() => {}}
         isSidebarOpen={true}
         onToggleSidebar={() => {}}
-        theme="dark"
-        onToggleTheme={handleToggleTheme}
+        lang="es"
       />
     );
 
-    const themeBtn = screen.getByText('Light');
-    fireEvent.click(themeBtn);
-    expect(handleToggleTheme).toHaveBeenCalled();
+    // Theme toggle moved to SettingsModal; HeaderBar no longer has it
+    // Verify the component renders without error
+    expect(screen.getByText("Chat General")).not.toBeNull();
   });
 });

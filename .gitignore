@@ -35,3 +35,8 @@ yarn-error.log*
 
 # Tauri audit log
 src-tauri/.crafter_audit.log
+
+# Crafter runtime data (encrypted local state — never commit)
+src-tauri/.crafter_storage/
+.crafter_storage/
+src-tauri/whisper/

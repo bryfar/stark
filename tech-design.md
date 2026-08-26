@@ -3,14 +3,14 @@
 ## Stack
 
 - **Shell:** Tauri 2 (Rust) — backend de escritorio.
-- **Frontend:** Svelte 5 (compila a Vanilla JS, sin runtime DOM virtual).
-- **UI:** Svelte 5 + Tailwind CSS 4 (ligero). Sin Next.js, sin React.
+- **Frontend:** Preact (JSX, runtime VDOM ~3 KB gz).
+- **UI:** Preact + Tailwind CSS 4 (ligero). Sin Next.js, sin React.
 - **Tooling:** Bun (runtime/package manager, más rápido y ligero que npm), TypeScript en frontend, Rust para el core.
 
 ## Estructura del proyecto
 
 ```
-crafter-repo/
+stark/
 ├── src-tauri/               # Backend Rust
 │   ├── src/
 │   │   ├── main.rs          # Entrypoint Tauri
@@ -45,23 +45,21 @@ crafter-repo/
 │   │       ├── copy.rs      # Modo copia sincronizada
 │   │       └── perimeter.rs # Modo perimetral
 │   └── Cargo.toml
-├── src/                     # Frontend Svelte 5
-│   ├── lib/
-│   │   ├── components/      # Chat, toggles, editor de plan, diff
-│   │   ├── stores/          # Estado global (Svelte 5 runes)
-│   │   └── api/             # Cliente de comandos Tauri
-│   ├── app.html
-│   └── main.ts
-├── vite.config.ts
+├── src/                     # Frontend Preact (JSX)
+│   ├── main.jsx             # Entry point (mounts <App/>)
+│   ├── App.jsx              # Global state, tabs, modals orchestration
+│   ├── components/          # Chat, toggles, editor de plan, diff, modals, pages
+│   ├── styles/              # main.css (Stark design tokens)
+│   └── i18n.js
+├── vite.config.js
 ├── package.json
-├── svelte.config.js
-├── tsconfig.json
-└── goal.md
+└── tsconfig.json
 ```
 
 ## Backend Rust — módulos
 
 ### Providers (adaptadores LLM)
+
 - Trait `Provider` con métodos: `chat_stream`, `chat` (no-stream), `models()`, `usage()`.
 - Cada adaptador traduce al formato del proveedor:
   - **OpenAICompatible (genérico):** POST `{base_url}/chat/completions` (streaming SSE) con `Bearer` — cubre OpenAI, Groq, OpenRouter, LM Studio, Ollama (endpoint `/v1`).
@@ -72,6 +70,7 @@ crafter-repo/
 - **Tokens:** usa los `usage` reportados por cada proveedor (informativo).
 
 ### Gestión de proveedores (multi-provider configurable)
+
 - Los providers son **datos gestionables por el usuario**: nombre, tipo, `base_url`, lista de modelos y API key opcional.
 - Persistidos cifrados (AES-256-GCM) en `storage::providers_store` → `.crafter_storage/providers_list.enc` + `api_key_{id}.enc`.
 - Presets precargados: Ollama, OpenAI, Anthropic, Gemini, Groq, OpenRouter, Mistral, LM Studio.
@@ -79,16 +78,19 @@ crafter-repo/
 - `send_chat_message` enruta dinámico: Anthropic/Gemini a sus adaptadores; el resto al adapter OpenAI-compatible usando `base_url` + API key guardados.
 
 ### Agent (plan/build)
+
 - **Plan mode:** construye contexto (tree + archivos relevantes), pide análisis/plan al LLM, NO edita.
-- **Build mode:** propone una *acción* ("voy a modificar X, Y, Z"), espera aprobación del usuario
+- **Build mode:** propone una _acción_ ("voy a modificar X, Y, Z"), espera aprobación del usuario
   vía evento Tauri; al aprobar, aplica la edición y registra en el log de cambios.
 - El agente razona paso a paso (system prompt de chain-of-thought) para cualquier modelo.
 
 ### Repo indexer
+
 - Construye un tree del repo (gitignore-aware). Cacheado en disco (local, reconstruible).
 - Selección de archivos relevantes por tarea (heurística por nombre/ruta/dependencias).
 
 ### Terminal (sandbox)
+
 - Ejecuta comandos con **timeout** y **límite de salida** (stdout/stderr acotado).
 - Dos modos:
   - **Copia sincronizada:** corre contra copia del repo; al aprobar se sincroniza al real.
@@ -96,15 +98,17 @@ crafter-repo/
 - Aprobación manual por comando desde la UI.
 
 ### Hardware detection
+
 - Lee RAM total/VRAM/CPU vía crates (`sysinfo`, `nvidia-smi`/vulkan para VRAM).
 - Mapea a tiers de modelos Ollama (tabla del goal). Se refinará con benchmarks reales.
 
 ### Crypto + storage
+
 - Clave maestra derivada de passphrase (Argon2), guardada en keyring (Secret Service/libsecret).
 - Conversaciones, log de cambios y config cifrados en reposo (AES-256-GCM).
 - Fallback sin keyring: passphrase por arranque; si se rechaza, archivo plano 0600 + warning.
 
-## Frontend Svelte 5 — componentes
+## Frontend Preact — componentes
 
 - **Chat:** lista de mensajes con streaming de tokens (markdown + código).
 - **Toggle LLM:** proveedor + modelo + modo de razonamiento (persistido en config cifrada).
@@ -142,6 +146,6 @@ crafter-repo/
 - **Latencia streaming:** eventos Tauri son asíncronos; chunkear tokens (p. ej. ~50ms) para
   no saturar el event loop.
 - **Memoria 300–500MB:** evitar cargar archivos grandes del repo al completo en memoria;
-  leer por rangos. Svelte compilado ayuda a mantener el frontend pequeño.
+  leer por rangos. Preact (~3 KB gz) ayuda a mantener el frontend pequeño.
 - **Sandbox sin root:** bubblewrap requiere `newuidmap`/`newgidmap` (userns). Documentar
   requisitos del kernel y fallback perimetral degradado.

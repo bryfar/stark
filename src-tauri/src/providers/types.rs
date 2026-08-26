@@ -19,6 +19,10 @@ pub struct StreamEvent {
     pub usage: Option<TokenUsage>,
     pub error: Option<String>,
     pub done: bool,
+    /// When set, the event belongs to a specific conversation; the frontend
+    /// ignores events whose `chat_id` does not match its currently active chat.
+    #[serde(default)]
+    pub chat_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -28,6 +32,11 @@ pub struct SendChatPayload {
     pub messages: Vec<ChatMessage>,
     pub reasoning: bool,
     pub api_key: Option<String>,
+    /// Optional chat id. When present, the stream is registered with the abort
+    /// registry so `chat_abort(chat_id)` can stop it; `None` keeps the stream
+    /// non-interceptable (retro-compatible).
+    #[serde(default)]
+    pub chat_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -49,6 +58,7 @@ pub enum ProviderKind {
     Anthropic,
     Gemini,
     Ollama,
+    Local,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -95,6 +105,7 @@ mod tests {
             usage: Some(usage.clone()),
             error: None,
             done: false,
+            chat_id: None,
         };
         assert_eq!(event.usage.unwrap().total_tokens, 25);
     }
@@ -113,6 +124,22 @@ mod tests {
         assert_eq!(payload.model, "qwen2.5:1.5b");
         assert!(payload.reasoning);
         assert_eq!(payload.messages.len(), 1);
+        // chat_id is optional and defaults to None (backward compatible).
+        assert_eq!(payload.chat_id, None);
+    }
+
+    #[test]
+    fn test_send_chat_payload_with_chat_id() {
+        let json_data = r#"{
+            "provider": "local",
+            "model": "qwen-0.5b-q2k",
+            "messages": [],
+            "reasoning": false,
+            "api_key": null,
+            "chat_id": "chat-123"
+        }"#;
+        let payload: SendChatPayload = serde_json::from_str(json_data).unwrap();
+        assert_eq!(payload.chat_id.as_deref(), Some("chat-123"));
     }
     #[test]
     fn test_provider_config_serialization() {

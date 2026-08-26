@@ -33,26 +33,25 @@ your repository with visual diff approval, and runs commands inside a
 
 ## Stack
 
-| Layer | Technology |
-|-------|------------|
-| Shell | Tauri 2 (Rust) |
-| Frontend | **Preact** 10 + custom CSS (no UI framework) |
-| Runtime / package manager | Bun (+ Vite) |
-| Backend language | Rust (Tokio, `async-trait`, `reqwest`, `serde`) |
-| Crypto | `argon2`, `aes-gcm` |
-| Sandbox | external `bwrap` / `firejail` binaries |
-| Tests | Rust: `cargo test` (wiremock). Frontend: Vitest + happy-dom |
+| Layer                     | Technology                                                  |
+| ------------------------- | ----------------------------------------------------------- |
+| Shell                     | Tauri 2 (Rust)                                              |
+| Frontend                  | **Preact** 10 + custom CSS (no UI framework)                |
+| Runtime / package manager | Bun (+ Vite)                                                |
+| Backend language          | Rust (Tokio, `async-trait`, `reqwest`, `serde`)             |
+| Crypto                    | `argon2`, `aes-gcm`                                         |
+| Sandbox                   | external `bwrap` / `firejail` binaries                      |
+| Tests                     | Rust: `cargo test` (wiremock). Frontend: Vitest + happy-dom |
 
-> ⚠️ **Docs drift:** `AGENTS.md` and the design docs still say “Svelte 5 (runes)”.
-> The *actual* frontend is **Preact JSX** (see `package.json`, `src/main.jsx`).
-> Trust the code and `package.json` over the docs.
+> ✅ **Stack locked: Preact JSX** (see `package.json`, `src/main.jsx`).
+> All design docs (`goal.md`, `tech-design.md`, `shaping.md`, `breadboarding.md`, `spec.md`, `AGENTS.md`) reflect the **Preact** frontend. The only historical "Svelte 5" mentions are in old grilling/scratch transcripts.
 
 ---
 
 ## Repository layout
 
 ```
-crafter-repo/
+stark/
 ├── src/                     # Frontend (Preact JSX)
 │   ├── main.jsx             # Entry point (mounts <App/>)
 │   ├── App.jsx              # Global state, routing, modals orchestration
@@ -107,29 +106,29 @@ crafter-repo/
 
 ### Commands → module map
 
-| Command | Module | Purpose |
-|---------|--------|---------|
-| `send_chat_message` | `providers::*` | Send conversation → LLM, emit `chat-token` |
-| `providers_*` | `storage::providers_store` | CRUD providers, save API keys, Ollama model detect/install |
-| `repo_index` | `repo::indexer` | Gitignore-aware file tree |
-| `edit_apply` | `repo` | Write edited file + append `.crafter_audit.log` |
-| `crypto_unlock` | `storage` | Derive master key from passphrase (Argon2id) |
-| `storage_save` / `storage_load` | `storage` | Encrypted key/value store (`.enc` files) |
-| `terminal_execute` (+`_ssh`) | `sandbox` | Run command under bwrap/firejail, emit `terminal:stdout/stderr` |
-| `hardware_detect` | `hardware` | RAM/VRAM tier for Ollama model suggestions |
-| `skills_list` / `skills_read` | `skills` | Discover + read skills in the workspace |
-| `voice_*` | `voice` | Install whisper, record (ffmpeg), transcribe (whisper-cli) |
+| Command                         | Module                     | Purpose                                                         |
+| ------------------------------- | -------------------------- | --------------------------------------------------------------- |
+| `send_chat_message`             | `providers::*`             | Send conversation → LLM, emit `chat-token`                      |
+| `providers_*`                   | `storage::providers_store` | CRUD providers, save API keys, Ollama model detect/install      |
+| `repo_index`                    | `repo::indexer`            | Gitignore-aware file tree                                       |
+| `edit_apply`                    | `repo`                     | Write edited file + append `.crafter_audit.log`                 |
+| `crypto_unlock`                 | `storage`                  | Derive master key from passphrase (Argon2id)                    |
+| `storage_save` / `storage_load` | `storage`                  | Encrypted key/value store (`.enc` files)                        |
+| `terminal_execute` (+`_ssh`)    | `sandbox`                  | Run command under bwrap/firejail, emit `terminal:stdout/stderr` |
+| `hardware_detect`               | `hardware`                 | RAM/VRAM tier for Ollama model suggestions                      |
+| `skills_list` / `skills_read`   | `skills`                   | Discover + read skills in the workspace                         |
+| `voice_*`                       | `voice`                    | Install whisper, record (ffmpeg), transcribe (whisper-cli)      |
 
 ---
 
 ## Where data lives
 
-| Data | Location | Notes |
-|------|----------|-------|
+| Data                                         | Location                           | Notes                                                                         |
+| -------------------------------------------- | ---------------------------------- | ----------------------------------------------------------------------------- |
 | Providers config, API keys, onboarding flags | `src-tauri/.crafter_storage/*.enc` | AES-256-GCM. Paths are **relative** to the process CWD (in dev: `src-tauri/`) |
-| Audit log of edits | `src-tauri/.crafter_audit.log` | Plaintext, append-only |
-| Whisper binary + model | `~/.local/share/crafter/whisper/` | Auto-installed on first dictation |
-| Project list (UI) | `localStorage` (`stark_projects`) | Frontend only |
+| Audit log of edits                           | `src-tauri/.crafter_audit.log`     | Plaintext, append-only                                                        |
+| Whisper binary + model                       | `~/.local/share/crafter/whisper/`  | Auto-installed on first dictation                                             |
+| Project list (UI)                            | `localStorage` (`stark_projects`)  | Frontend only                                                                 |
 
 ⚠️ **Current gap:** chat sessions are **not persisted**. Messages live only in the
 Preact store — closing the app loses the conversation. There is no chat-storage
@@ -269,29 +268,29 @@ flowchart LR
 
 ### Objetivos con criterio de éxito
 
-| # | Objetivo | Estado | Criterio de éxito | Referencia |
-|---|----------|--------|-------------------|------------|
-| G1 | Arranque rápido | ✅ | UI interactiva en ≤5 s en hardware modesto | `goal.md:85` |
-| G2 | Memoria en reposo | ✅ objetivo | ≤500 MB RAM idle (verificable con `/proc/meminfo`) | `goal.md:86` |
-| G3 | Streaming real de tokens | ⏳ | tokens progresivos, UI <50 ms/frame, sin buffer completo | `spec.md` Q5 |
-| G4 | Render de código (markdown) | ⏳ | bloques de código resaltados + botón copiar | gap #1 |
-| G5 | Chat persistido cifrado | ⏳ | cerrar/reabrir conserva conversaciones (`.enc`) | gap #2 |
-| G6 | Diff real de ediciones | ⏳ | dos archivos → unified diff (estilo git) con aprobar/rechazar | gap #6 |
-| G7 | Sandbox robusto | ✅ base | timeout obligatorio, sin allowlist, límite de salida | guardrail 4 |
-| G8 | Detección de hardware | ✅ | tiers Lite/Basic/Standard/Pro | `hardware/` |
-| G9 | Keyring / Secret Service | ⏳ | API key via Secret Service; fallback plano 0600 | `goal.md:70` |
-| G10 | Packaging multi-distro | ⏳ | `.deb`/`.rpm` junto al AppImage | `spec.md:139` |
+| #   | Objetivo                    | Estado      | Criterio de éxito                                             | Referencia    |
+| --- | --------------------------- | ----------- | ------------------------------------------------------------- | ------------- |
+| G1  | Arranque rápido             | ✅          | UI interactiva en ≤5 s en hardware modesto                    | `goal.md:85`  |
+| G2  | Memoria en reposo           | ✅ objetivo | ≤500 MB RAM idle (verificable con `/proc/meminfo`)            | `goal.md:86`  |
+| G3  | Streaming real de tokens    | ⏳          | tokens progresivos, UI <50 ms/frame, sin buffer completo      | `spec.md` Q5  |
+| G4  | Render de código (markdown) | ⏳          | bloques de código resaltados + botón copiar                   | gap #1        |
+| G5  | Chat persistido cifrado     | ⏳          | cerrar/reabrir conserva conversaciones (`.enc`)               | gap #2        |
+| G6  | Diff real de ediciones      | ⏳          | dos archivos → unified diff (estilo git) con aprobar/rechazar | gap #6        |
+| G7  | Sandbox robusto             | ✅ base     | timeout obligatorio, sin allowlist, límite de salida          | guardrail 4   |
+| G8  | Detección de hardware       | ✅          | tiers Lite/Basic/Standard/Pro                                 | `hardware/`   |
+| G9  | Keyring / Secret Service    | ⏳          | API key via Secret Service; fallback plano 0600               | `goal.md:70`  |
+| G10 | Packaging multi-distro      | ⏳          | `.deb`/`.rpm` junto al AppImage                               | `spec.md:139` |
 
 ### Orden de prioridad recomendada (impacto / esfuerzo)
 
-| Paso | Trabajo | Dónde | Esfuerzo |
-|------|---------|-------|----------|
-| 1 | **G5** Persistir chats cifrados | `storage/` + `App.jsx` | bajo |
-| 2 | **G4** Markdown + resaltado | `ChatView.jsx` + `marked` | bajo |
-| 3 | **G3** Streaming SSE real | `providers/*.rs` + eventos | medio |
-| 4 | **G6** Diff real (unified) | `repo/` + `DiffModal` | medio |
-| 5 | **G9** Keyring / Secret Service | `storage/` | medio |
-| 6 | **G10** Empaquetado .deb/.rpm | `tauri.conf.json` | bajo |
+| Paso | Trabajo                         | Dónde                      | Esfuerzo |
+| ---- | ------------------------------- | -------------------------- | -------- |
+| 1    | **G5** Persistir chats cifrados | `storage/` + `App.jsx`     | bajo     |
+| 2    | **G4** Markdown + resaltado     | `ChatView.jsx` + `marked`  | bajo     |
+| 3    | **G3** Streaming SSE real       | `providers/*.rs` + eventos | medio    |
+| 4    | **G6** Diff real (unified)      | `repo/` + `DiffModal`      | medio    |
+| 5    | **G9** Keyring / Secret Service | `storage/`                 | medio    |
+| 6    | **G10** Empaquetado .deb/.rpm   | `tauri.conf.json`          | bajo     |
 
 ### Cómo usar esta ruta
 
@@ -307,14 +306,14 @@ flowchart LR
 
 Good entry points for a new contributor:
 
-| You want to… | Start here |
-|--------------|-----------|
-| Add an LLM provider | `src-tauri/src/providers/mod.rs` (implement `Provider` trait) |
+| You want to…             | Start here                                                                              |
+| ------------------------ | --------------------------------------------------------------------------------------- |
+| Add an LLM provider      | `src-tauri/src/providers/mod.rs` (implement `Provider` trait)                           |
 | Expose a new IPC command | add a `#[tauri::command]` in `src-tauri/src/lib.rs` + register in the `invoke_handler!` |
-| Change the chat UI | `src/components/ChatView.jsx` |
-| Change the sandbox | `src-tauri/src/sandbox/mod.rs` |
-| Storage / crypto | `src-tauri/src/storage/` |
-| Voice input | `src-tauri/src/voice/mod.rs` |
+| Change the chat UI       | `src/components/ChatView.jsx`                                                           |
+| Change the sandbox       | `src-tauri/src/sandbox/mod.rs`                                                          |
+| Storage / crypto         | `src-tauri/src/storage/`                                                                |
+| Voice input              | `src-tauri/src/voice/mod.rs`                                                            |
 
 ### Conventions
 
@@ -329,14 +328,14 @@ Good entry points for a new contributor:
 
 ## Documentation index
 
-| File | Contents |
-|------|----------|
-| `goal.md` | Product objectives, verification criteria, build order |
-| `tech-design.md` | Architecture, module boundaries, IPC contracts, risks |
-| `spec.md` | Exhaustive user stories + acceptance criteria |
-| `shaping.md` | Scope decisions, three forms evaluated, vertical slices |
-| `breadboarding.md` | UI affordances, code affordances, Mermaid flow |
-| `DESIGN.md` | Stark design system (colors, typography, components) |
+| File               | Contents                                                |
+| ------------------ | ------------------------------------------------------- |
+| `goal.md`          | Product objectives, verification criteria, build order  |
+| `tech-design.md`   | Architecture, module boundaries, IPC contracts, risks   |
+| `spec.md`          | Exhaustive user stories + acceptance criteria           |
+| `shaping.md`       | Scope decisions, three forms evaluated, vertical slices |
+| `breadboarding.md` | UI affordances, code affordances, Mermaid flow          |
+| `DESIGN.md`        | Stark design system (colors, typography, components)    |
 
 ---
 

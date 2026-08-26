@@ -81,12 +81,39 @@ pub fn parse_kind(kind: &str) -> ProviderKind {
         "anthropic" => ProviderKind::Anthropic,
         "gemini" => ProviderKind::Gemini,
         "ollama" => ProviderKind::Ollama,
+        "local" => ProviderKind::Local,
         _ => ProviderKind::OpenAICompatible,
     }
 }
 
 pub fn preset_providers() -> Vec<ProviderConfig> {
     vec![
+        ProviderConfig {
+            id: "stark-free".to_string(),
+            name: "Stark Free (OpenRouter)".to_string(),
+            kind: ProviderKind::OpenAICompatible,
+            base_url: Some("https://openrouter.ai/api/v1".to_string()),
+            models: vec![
+                "meta-llama/llama-3.1-8b-instruct:free".to_string(),
+                "mistralai/mistral-7b-instruct:free".to_string(),
+                "google/gemma-2-9b-it:free".to_string(),
+                "qwen/qwen-2-7b-instruct:free".to_string(),
+            ],
+            needs_api_key: true,
+        },
+        ProviderConfig {
+            id: "nvidia-nim".to_string(),
+            name: "NVIDIA NIM (GLM-5.2)".to_string(),
+            kind: ProviderKind::OpenAICompatible,
+            base_url: Some("https://integrate.api.nvidia.com/v1".to_string()),
+            models: vec![
+                "z-ai/glm-5.2".to_string(),
+                "deepseek-ai/deepseek-v4-flash-0731".to_string(),
+                "meta/llama-3.3-70b-instruct".to_string(),
+                "mistralai/mistral-nemotron".to_string(),
+            ],
+            needs_api_key: true,
+        },
         ProviderConfig {
             id: "ollama".to_string(),
             name: "Ollama Local".to_string(),
@@ -97,6 +124,21 @@ pub fn preset_providers() -> Vec<ProviderConfig> {
                 "llama3.2:3b".to_string(),
                 "phi3:mini".to_string(),
                 "deepseek-coder:6.7b".to_string(),
+            ],
+            needs_api_key: false,
+        },
+        ProviderConfig {
+            id: "pollinations-free".to_string(),
+            name: "Pollinations Free (sin API)".to_string(),
+            kind: ProviderKind::OpenAICompatible,
+            base_url: Some("https://text.pollinations.ai/openai/v1".to_string()),
+            models: vec![
+                "openai".to_string(),
+                "mistral".to_string(),
+                "qwen".to_string(),
+                "llama".to_string(),
+                "deepseek".to_string(),
+                "gemini".to_string(),
             ],
             needs_api_key: false,
         },
@@ -178,6 +220,23 @@ pub fn preset_providers() -> Vec<ProviderConfig> {
             models: Vec::new(),
             needs_api_key: false,
         },
+        ProviderConfig {
+            id: "opencode-zen".to_string(),
+            name: "OpenCode Zen".to_string(),
+            kind: ProviderKind::OpenAICompatible,
+            base_url: Some("https://opencode.ai/zen/v1".to_string()),
+            models: vec![
+                "deepseek-v4-flash-free".to_string(),
+                "mimo-v2.5-free".to_string(),
+                "ling-3.0-flash-free".to_string(),
+                "ling-3.0-tiny-free".to_string(),
+                "nemotron-3-ultra-free".to_string(),
+                "north-mini-code-free".to_string(),
+                "laguna-s-2.1-free".to_string(),
+                "longcat-2.0-free".to_string(),
+            ],
+            needs_api_key: true,
+        },
     ]
 }
 
@@ -230,5 +289,6 @@ mod tests {
         assert!(ids.contains(&"groq"));
         assert!(ids.contains(&"openrouter"));
         assert!(ids.contains(&"mistral"));
+        assert!(ids.contains(&"nvidia-nim"));
     }
 }

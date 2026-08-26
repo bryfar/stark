@@ -1,6 +1,12 @@
+pub mod bundled;
+pub mod creator;
 pub mod loader;
 
-use loader::{list_all_skills, SkillInfo};
+pub use creator::{
+    create_agent, create_plugin, create_skill, list_agents, list_plugins, AgentInfo, AssetScope,
+    PluginInfo,
+};
+pub use loader::{list_all_skills, SkillInfo};
 use std::fs;
 use std::path::Path;
 
@@ -22,7 +28,7 @@ mod tests {
 
     #[test]
     fn test_get_skills_returns_list() {
-        let skills = get_skills("/home/bryan/Downloads/Repos/crafter-repo");
+        let skills = get_skills("/home/bryan/Downloads/Repos/stark");
         assert!(!skills.is_empty());
         assert!(skills.iter().any(|s| s.name == "to-spec" || s.name == "to-tickets"));
     }
